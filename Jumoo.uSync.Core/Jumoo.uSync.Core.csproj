@@ -317,6 +317,7 @@
     <Compile Include="Serializers\SyncBaseSerializer.cs" />
     <Compile Include="Serializers\TemplateSerializer.cs" />
     <Compile Include="SyncAttempt.cs" />
+    <Compile Include="uSyncAction.cs" />
     <Compile Include="uSyncContext.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="uSyncCoreConfig.cs" />

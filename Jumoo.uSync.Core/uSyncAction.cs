@@ -13,7 +13,7 @@ using Umbraco.Core.Logging;
 using Umbraco.Core.Models.EntityBase;
 using Umbraco.Core.Models;
 
-namespace Jumoo.uSync.BackOffice
+namespace Jumoo.uSync.Core
 {
 
     public struct uSyncAction
