@@ -258,6 +258,7 @@
   <ItemGroup>
     <Compile Include="Interfaces\ISyncManager.cs" />
     <Compile Include="Managers\BaseSyncManager.cs" />
+    <Compile Include="Managers\DataTypeManager.cs" />
     <Compile Include="Managers\MemberTypeManager.cs" />
     <Compile Include="Managers\MediaTypeManager.cs" />
     <Compile Include="Managers\ContentTypeManager.cs" />
