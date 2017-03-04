@@ -18,6 +18,7 @@ namespace Jumoo.uSync.IO
         string SyncFolder { get; set; }
 
         int Priority { get; set; }
+        Type ItemType { get; }
 
 
         IEnumerable<uSyncAction> Import(string folder, bool force);

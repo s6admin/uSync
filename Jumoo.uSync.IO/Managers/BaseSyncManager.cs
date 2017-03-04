@@ -45,6 +45,13 @@ namespace Jumoo.uSync.IO.Managers
 
         public abstract uSyncAction ReportItem(string file);
 
+        virtual public IEnumerable<uSyncAction> PostImport(string folder, IEnumerable<uSyncAction> actions) {
+            return new List<uSyncAction>();
+        }
+
+        protected virtual bool RemoveContainer(int id) {
+            return false;
+        }
 
         public IEnumerable<uSyncAction> Import(string folder, bool force)
         {
@@ -181,7 +188,6 @@ namespace Jumoo.uSync.IO.Managers
             return actions;
         }
 
-        protected abstract bool RemoveContainer(int id);
 
 
         protected XElement GetNode(string file)

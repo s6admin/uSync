@@ -22,6 +22,8 @@ namespace Jumoo.uSync.IO.Managers
         public string SyncFolder { get; set; }
 
         private readonly IContentTypeService contentTypeService;
+        public Type ItemType => typeof(IMediaType);
+
 
         public MediaTypeManager(
             ILogger Logger, 

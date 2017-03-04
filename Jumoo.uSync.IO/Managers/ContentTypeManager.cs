@@ -20,6 +20,7 @@ namespace Jumoo.uSync.IO.Managers
         public string Name => "ContentTypeManager";
         public int Priority { get; set; }
         public string SyncFolder { get; set; }
+        public Type ItemType => typeof(IContentType);
 
         private readonly IContentTypeService contentTypeService;
 

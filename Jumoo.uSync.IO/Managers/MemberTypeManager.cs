@@ -22,6 +22,7 @@ namespace Jumoo.uSync.IO.Managers
         public string SyncFolder { get; set; }
 
         private readonly IMemberTypeService memberTypeService;
+        public Type ItemType => typeof(IMemberType);
 
         public MemberTypeManager(
             ILogger Logger, 

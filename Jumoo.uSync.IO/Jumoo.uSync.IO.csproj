@@ -258,6 +258,10 @@
   <ItemGroup>
     <Compile Include="Interfaces\ISyncManager.cs" />
     <Compile Include="Managers\BaseSyncManager.cs" />
+    <Compile Include="Managers\LanguageHandler.cs" />
+    <Compile Include="Managers\TemplateManager.cs" />
+    <Compile Include="Managers\MarcoManager.cs" />
+    <Compile Include="Managers\DictionaryManager.cs" />
     <Compile Include="Managers\DataTypeManager.cs" />
     <Compile Include="Managers\MemberTypeManager.cs" />
     <Compile Include="Managers\MediaTypeManager.cs" />

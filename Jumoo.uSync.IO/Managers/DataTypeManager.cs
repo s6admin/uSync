@@ -20,6 +20,8 @@ namespace Jumoo.uSync.IO.Managers
         public string Name => "DataTypeManager";
         public int Priority { get; set; }
         public string SyncFolder { get; set; }
+        public Type ItemType => typeof(IDataTypeDefinition);
+
 
         private readonly IDataTypeService dataTypeService;
 
@@ -33,6 +35,8 @@ namespace Jumoo.uSync.IO.Managers
             objectType = UmbracoObjectTypes.DataType;
             containerType = UmbracoObjectTypes.DataTypeContainer;
             dataTypeService = serviceContext.DataTypeService;
+
+            requiresPostProcessing = true;
         }
 
         public override SyncAttempt<IDataTypeDefinition> ImportItem(string file, bool force)
@@ -57,7 +61,7 @@ namespace Jumoo.uSync.IO.Managers
             uSyncContext.DataTypeSerializer.DesearlizeSecondPass(item, node);
         }
 
-        public IEnumerable<uSyncAction> PostImport(string folder, IEnumerable<uSyncAction> actions)
+        public override IEnumerable<uSyncAction> PostImport(string folder, IEnumerable<uSyncAction> actions)
         {
             if (actions.Any(x => x.ItemType == typeof(IDataTypeDefinition)))
             {
