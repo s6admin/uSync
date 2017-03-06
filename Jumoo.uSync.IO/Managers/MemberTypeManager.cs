@@ -14,7 +14,7 @@ using System.IO;
 
 namespace Jumoo.uSync.IO.Managers
 {
-    public class MemberTypeManager : BaseSyncManager<IMemberType>, ISyncManager
+    public class MemberTypeManager : BaseSyncIOManager<IMemberType>, ISyncIOManager
     {
         public Guid Key => Guid.Parse("E08B03C9-C010-4462-BE7D-7E9DF6DA452C");
         public string Name => "MemberTypeManager";
@@ -59,7 +59,7 @@ namespace Jumoo.uSync.IO.Managers
             uSyncContext.MemberTypeSerializer.DesearlizeSecondPass(item, node);
         }
 
-        public IEnumerable<uSyncAction> PostImport(string folder, IEnumerable<uSyncAction> actions)
+        public override IEnumerable<uSyncAction> PostImport(string folder, IEnumerable<uSyncAction> actions)
         {
             if (actions.Any(x => x.ItemType == typeof(IMemberType)))
             {
@@ -119,12 +119,5 @@ namespace Jumoo.uSync.IO.Managers
 
             return action;
         }
-
-        protected override bool RemoveContainer(int id)
-        {
-            // var attempt = memberTypeService.Delete()
-            return true;
-        }
-
     }
 }

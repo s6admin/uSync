@@ -14,7 +14,7 @@ using System.IO;
 
 namespace Jumoo.uSync.IO.Managers
 {
-    public class TemplateManager : BaseSyncManager<ITemplate>, ISyncManager
+    public class TemplateManager : BaseSyncIOManager<ITemplate>, ISyncIOManager
     {
         public Guid Key => Guid.Parse("B20217B2-69BE-4EC8-94F1-780901249AC6");
         public string Name => "TemplateManager";
@@ -98,7 +98,7 @@ namespace Jumoo.uSync.IO.Managers
 
             var action = uSyncActionHelper<ITemplate>.ReportAction(update, node.NameFromNode());
             if (action.Change > ChangeType.NoChange)
-                action.Details = ((ISyncChangeDetail)uSyncContext.DataTypeSerializer).GetChanges(node);
+                action.Details = ((ISyncChangeDetail)uSyncContext.TemplateSerializer).GetChanges(node);
 
             return action;
         }

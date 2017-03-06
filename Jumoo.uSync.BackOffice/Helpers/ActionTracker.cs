@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Jumoo.uSync.Core;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -155,7 +156,7 @@ namespace Jumoo.uSync.BackOffice.Helpers
             return _actions;
         }
     }
-
+    /*
     public class SyncAction
     {
         public string TypeName { get; set; }
@@ -170,4 +171,5 @@ namespace Jumoo.uSync.BackOffice.Helpers
         Rename,
         Obsolete, 
     }
+    */
 }

@@ -11,12 +11,17 @@ namespace Jumoo.uSync.Core
     using System.Linq;
     using System;
     using System.Diagnostics;
+    using Umbraco.Core.Services;
+    using Umbraco.Core.IO;
 
     public class uSyncCoreContext
     {
         private static uSyncCoreContext _instance;
 
-        private uSyncCoreContext() { }
+        [Obsolete("Pass parameters.")]
+        private uSyncCoreContext() {
+            _logger = ApplicationContext.Current.ProfilingLogger.Logger;
+        }
 
         public static uSyncCoreContext Instance
         {
@@ -45,39 +50,50 @@ namespace Jumoo.uSync.Core
 
         public uSyncCoreConfig Configuration { get; set; }
 
+        [Obsolete("Intialize via the Ensure Context Method")]
         public void Init()
         {
-            Configuration = new uSyncCoreConfig();
+            EnsureContext(
+                ApplicationContext.Current.ProfilingLogger.Logger,
+                FileSystemProviderManager.Current.GetUnderlyingFileSystemProvider("usync"),
+                ApplicationContext.Current.Services);
+        }
 
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
+        internal void InitializeSerializers()
+        {
+            Serailizers = new Dictionary<string, ISyncSerializerBase>();
 
-            /*
-            ContentTypeSerializer = new ContentTypeSerializer(Constants.Packaging.DocumentTypeNodeName);
-            MediaTypeSerializer = new MediaTypeSerializer("MediaType");
+            var types = TypeFinder.FindClassesOfType<ISyncSerializerBase>();
+            foreach (var type in types)
+            {
+                var instance = Activator.CreateInstance(type) as ISyncSerializerBase;
+                _logger.Debug<uSyncCoreContext>("Adding Serializer: {0}:{1}", ()=> instance.SerializerType, () => type.Name);
 
-            MemberTypeSerializer = new MemberTypeSerializer("MemberType");
+                if (!this.Serailizers.ContainsKey(instance.SerializerType))
+                {
+                    Serailizers.Add(instance.SerializerType, instance);
+                }
+                else
+                {
+                    // we need to see if the new serializer of the same type has a higher priority
+                    // then the one we already have...
+                    var currentPriority = Serailizers[instance.SerializerType].Priority;
+                    _logger.Debug<uSyncCoreContext>("Duplicate Serializer Found: {0} comparing priorites", () => instance.SerializerType);
 
-            TemplateSerializer = new TemplateSerializer(Constants.Packaging.TemplateNodeName);
+                    if (instance.Priority > currentPriority)
+                    {
+                        _logger.Debug<uSyncCoreContext>("Loading new Serializer for {0} {1}", () => instance.SerializerType, ()=> type.Name);
+                        Serailizers.Remove(instance.SerializerType);
+                        Serailizers.Add(instance.SerializerType, instance);
+                    }
+                }
+            }
 
-            LanguageSerializer = new LanguageSerializer("Language");
-            DictionarySerializer = new DictionarySerializer(Constants.Packaging.DictionaryItemNodeName);
-
-            MacroSerializer = new MacroSerializer(Constants.Packaging.MacroNodeName);
-            DataTypeSerializer = new DataTypeSerializer(Constants.Packaging.DataTypeNodeName);
-
-            ContentSerializer = new ContentSerializer();
-            MediaSerializer = new MediaSerializer();
-            */
-
-            LogHelper.Debug<uSyncCoreContext>("Initializing uSync.Core");
-
-            LoadSerializers();
-
+            // shortcuts..
             if (Serailizers != null)
             {
                 // we load the known shortcuts here. (to maintain the backwards compatability 
-                if (Serailizers[uSyncConstants.Serailization.ContentType] is ContentTypeSerializer )
+                if (Serailizers[uSyncConstants.Serailization.ContentType] is ContentTypeSerializer)
                     ContentTypeSerializer = (ContentTypeSerializer)Serailizers[uSyncConstants.Serailization.ContentType];
 
                 if (Serailizers[uSyncConstants.Serailization.MediaType] is MediaTypeSerializer)
@@ -108,42 +124,6 @@ namespace Jumoo.uSync.Core
                     MediaSerializer = (MediaSerializer)Serailizers[uSyncConstants.Serailization.Media];
             }
 
-            MediaFileMover = new uSyncMediaFileMover();
-
-            sw.Stop();
-            LogHelper.Info<uSyncCoreContext>("Loading Context ({0}ms)", () => sw.ElapsedMilliseconds);
-        }
-
-
-        public void LoadSerializers()
-        {
-            Serailizers = new Dictionary<string, ISyncSerializerBase>();
-
-            var types = TypeFinder.FindClassesOfType<ISyncSerializerBase>();
-            foreach (var type in types)
-            {
-                var instance = Activator.CreateInstance(type) as ISyncSerializerBase;
-                LogHelper.Debug<uSyncCoreContext>("Adding Serializer: {0}:{1}", ()=> instance.SerializerType, () => type.Name);
-
-                if (!this.Serailizers.ContainsKey(instance.SerializerType))
-                {
-                    Serailizers.Add(instance.SerializerType, instance);
-                }
-                else
-                {
-                    // we need to see if the new serializer of the same type has a higher priority
-                    // then the one we already have...
-                    var currentPriority = Serailizers[instance.SerializerType].Priority;
-                    LogHelper.Debug<uSyncCoreContext>("Duplicate Serializer Found: {0} comparing priorites", () => instance.SerializerType);
-
-                    if (instance.Priority > currentPriority)
-                    {
-                        LogHelper.Debug<uSyncCoreContext>("Loading new Serializer for {0} {1}", () => instance.SerializerType, ()=> type.Name);
-                        Serailizers.Remove(instance.SerializerType);
-                        Serailizers.Add(instance.SerializerType, instance);
-                    }
-                }
-            }
         }
 
         public string Version
@@ -151,8 +131,69 @@ namespace Jumoo.uSync.Core
             get
             {
                 return typeof(Jumoo.uSync.Core.uSyncCoreContext)
-                  .Assembly.GetName().Version.ToString();
+                    .Assembly.GetName().Version.ToString();
             }
+        }
+
+
+        private ILogger _logger;
+        public uSyncCoreContext(ILogger logger)
+        {
+            _logger = logger;
+        }
+        
+        internal void Initialize(
+            ILogger logger,
+            IFileSystem fileSystem,
+            ServiceContext services
+            )
+        {
+            this.Configuration = new uSyncCoreConfig();
+            InitializeSerializers();
+            MediaFileMover = new uSyncMediaFileMover();
+
+            InitializeIOManagers(_logger, fileSystem, services);
+        }
+
+        public static uSyncCoreContext EnsureContext(
+            ILogger logger,
+            IFileSystem fileSystem,
+            ServiceContext services)
+        {
+            var ctx = new uSyncCoreContext(logger);
+            ctx.Initialize(logger, fileSystem, services);
+            _instance = ctx;
+            return _instance;
+        }
+
+        public SortedList<int, ISyncIOManager> IOManagers { get; set; }
+
+        public void InitializeIOManagers(
+            ILogger logger,
+            IFileSystem fileSystem,
+            ServiceContext serviceContext)
+        {
+            IOManagers = new SortedList<int, ISyncIOManager>();
+
+            var types = TypeFinder.FindClassesOfType<ISyncIOManager>();
+            foreach (var t in types)
+            {
+                var instance = Activator.CreateInstance(t,
+                    logger, fileSystem, this, serviceContext) as ISyncIOManager;
+                if (instance != null)
+                {
+                    IOManagers.Add(instance.Priority, instance);
+                }
+            }
+        }
+
+        public ISyncIOManager GetIOManager(Type itemType)
+        {
+            var IOManager = IOManagers.Single(x => x.Value.ItemType == itemType);
+            if (IOManager.Value == null)
+                throw new KeyNotFoundException();
+
+            return IOManager.Value;
         }
 
     }
