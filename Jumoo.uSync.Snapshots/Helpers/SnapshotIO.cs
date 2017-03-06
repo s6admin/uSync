@@ -1,4 +1,5 @@
 ﻿using Jumoo.uSync.BackOffice.Helpers;
+using Jumoo.uSync.Core;
 using Jumoo.uSync.Core.Extensions;
 using System;
 using System.Collections.Generic;

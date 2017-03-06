@@ -10,6 +10,7 @@ using System.IO;
 using System.IO.Abstractions;
 using Jumoo.uSync.BackOffice;
 using System.Diagnostics;
+using Jumoo.uSync.Core;
 
 namespace Jumoo.uSync.Chauffeur
 {

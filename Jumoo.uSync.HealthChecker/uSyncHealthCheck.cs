@@ -8,6 +8,7 @@ using Umbraco.Web.HealthCheck;
 
 using Jumoo.uSync.BackOffice;
 using Umbraco.Core.Logging;
+using Jumoo.uSync.Core;
 
 namespace Jumoo.uSync.HealthChecker
 {

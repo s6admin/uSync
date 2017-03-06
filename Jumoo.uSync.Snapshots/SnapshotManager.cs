@@ -7,6 +7,7 @@ using Umbraco.Core.IO;
 using Jumoo.uSync.BackOffice;
 using Umbraco.Core.Logging;
 using Jumoo.uSync.Snapshots.Data;
+using Jumoo.uSync.Core;
 
 namespace Jumoo.uSync.Snapshots
 {
