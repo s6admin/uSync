@@ -180,7 +180,7 @@ namespace Jumoo.uSync.Core
             }
         }
 
-        internal static int ClearHistory()
+        public static int ClearHistory()
         {
             // deletes the files in the history folder.
             var folderPath = IOHelper.MapPath(Path.Combine(SystemDirectories.Data, "temp", "uSync"));

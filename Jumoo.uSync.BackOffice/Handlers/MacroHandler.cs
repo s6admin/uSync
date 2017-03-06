@@ -22,70 +22,6 @@ namespace Jumoo.uSync.BackOffice.Handlers
         public int Priority { get { return uSyncConstants.Priority.Macros; } }
         public string SyncFolder { get { return Constants.Packaging.MacroNodeName; } }
 
-        public override SyncAttempt<IMacro> Import(string filePath, bool force = false)
-        {
-            if (!System.IO.File.Exists(filePath))
-                throw new FileNotFoundException(filePath);
-
-            var node = XElement.Load(filePath);
-
-            return uSyncCoreContext.Instance.MacroSerializer.DeSerialize(node, force);
-        }
-
-        public override uSyncAction DeleteItem(Guid key, string keyString)
-        {
-            var item = ApplicationContext.Current.Services.MacroService.GetByAlias(keyString);
-            if (item != null)
-            {
-                LogHelper.Info<MacroHandler>("Deleteing: {0}", () => item.Alias);
-                ApplicationContext.Current.Services.MacroService.Delete(item);
-
-                return uSyncAction.SetAction(true, keyString, typeof(IMacro), ChangeType.Delete);
-            }
-
-            return uSyncAction.Fail(keyString, typeof(IMacro), ChangeType.Delete, "Not found");
-        }
-
-        public IEnumerable<uSyncAction> ExportAll(string folder)
-        {
-            LogHelper.Info<MacroHandler>("Exporting all Macros");
-
-            List<uSyncAction> actions = new List<uSyncAction>();
-
-            var _macroService = ApplicationContext.Current.Services.MacroService;
-            foreach (var item in _macroService.GetAll())
-            {
-                if (item != null)
-                    actions.Add(ExportToDisk(item, folder));
-            }
-            return actions;
-        }
-
-        public uSyncAction ExportToDisk(IMacro item, string folder)
-        {
-            if (item == null)
-                return uSyncAction.Fail(Path.GetFileName(folder), typeof(IMacro), "item not set");
-
-            try
-            {
-                var attempt = uSyncCoreContext.Instance.MacroSerializer.Serialize(item);
-                var filename = string.Empty;
-
-                if (attempt.Success)
-                {
-                    filename = uSyncIOHelper.SavePath(folder, SyncFolder, item.Alias.ToSafeAlias());
-                    uSyncIOHelper.SaveNode(attempt.Item, filename);
-                }
-                return uSyncActionHelper<XElement>.SetAction(attempt, filename);
-
-            }
-            catch (Exception ex)
-            {
-                return uSyncAction.Fail(item.Name, item.GetType(), ChangeType.Export, ex);
-
-            }
-        }
-
         public void RegisterEvents()
         {
             MacroService.Saved += MacroService_Saved;
@@ -114,7 +50,7 @@ namespace Jumoo.uSync.BackOffice.Handlers
             foreach (var item in e.SavedEntities)
             {
                 LogHelper.Info<MacroHandler>("Save: Saving uSync file for item: {0}", () => item.Name);
-                var action = ExportToDisk(item, uSyncBackOfficeContext.Instance.Configuration.Settings.Folder);
+                var action = _ioManager.ExportItem(item.Key, uSyncBackOfficeContext.Instance.Configuration.Settings.Folder);
                 if (action.Success)
                 {
                     // Name checker currently only works on guidkeys. 
@@ -128,18 +64,5 @@ namespace Jumoo.uSync.BackOffice.Handlers
                 }
             }
         }
-
-        public override uSyncAction ReportItem(string file)
-        {
-            var node = XElement.Load(file);
-            var update = uSyncCoreContext.Instance.MacroSerializer.IsUpdate(node);
-            var action = uSyncActionHelper<IMacro>.ReportAction(update, node.NameFromNode());
-            if (action.Change > ChangeType.NoChange)
-                action.Details = ((ISyncChangeDetail)uSyncCoreContext.Instance.MacroSerializer).GetChanges(node);
-
-            return action;
-        }
-
-
     }
 }

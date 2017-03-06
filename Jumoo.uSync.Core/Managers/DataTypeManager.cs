@@ -11,8 +11,9 @@ using Umbraco.Core.Logging;
 using Umbraco.Core.Models;
 using Umbraco.Core.Services;
 using System.IO;
+using Jumoo.uSync.Core.Interfaces;
 
-namespace Jumoo.uSync.IO.Managers
+namespace Jumoo.uSync.Core.IO
 {
     public class DataTypeManager : BaseSyncIOManager<IDataTypeDefinition>, ISyncIOManager
     {
@@ -63,8 +64,20 @@ namespace Jumoo.uSync.IO.Managers
 
         public override IEnumerable<uSyncAction> PostImport(string folder, IEnumerable<uSyncAction> actions)
         {
-            if (actions.Any(x => x.ItemType == typeof(IDataTypeDefinition)))
+            if (actions == null || !actions.Any())
+                return null;
+
+            var datatypes = actions.Where(x => x.ItemType == typeof(IDataTypeDefinition));
+            if (datatypes.Any())
             {
+                foreach(var action in datatypes)
+                {
+                    var attempt = this.ImportItem(action.FileName, false);
+                    if (attempt.Success)
+                    {
+                        this.ImportItemAgain(action.FileName, attempt.Item);
+                    }
+                }
                 return CleanEmptyContainers(folder, -1);
             }
             return null;
@@ -127,6 +140,8 @@ namespace Jumoo.uSync.IO.Managers
             var attempt = dataTypeService.DeleteContainer(id);
             return attempt.Success;
         }
+
+        
 
     }
 }

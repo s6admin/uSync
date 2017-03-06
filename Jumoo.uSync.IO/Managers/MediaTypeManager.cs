@@ -14,7 +14,7 @@ using System.IO;
 
 namespace Jumoo.uSync.IO.Managers
 {
-    public class MediaTypeManager : BaseSyncManager<IMediaType>, ISyncManager
+    public class MediaTypeManager : BaseSyncIOManager<IMediaType>, ISyncIOManager
     {
         public Guid Key => Guid.Parse("AA8B9C7D-9346-4F25-B76D-E2AEA2F7F6CF");
         public string Name => "MediaTypeManager";

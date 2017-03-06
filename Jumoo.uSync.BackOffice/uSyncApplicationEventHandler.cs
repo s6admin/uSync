@@ -11,12 +11,14 @@ namespace Jumoo.uSync.BackOffice
     using System.Linq;
     using Core;
     using System;
+    using Umbraco.Core.Services;
+    using Umbraco.Core.IO;
 
     public class uSyncApplicationEventHandler : ApplicationEventHandler
     {
         protected override void ApplicationStarted(UmbracoApplicationBase umbracoApplication, ApplicationContext applicationContext)
         {
-            LogHelper.Info<uSyncApplicationEventHandler>("Initializing uSync 73");
+            LogHelper.Info<uSyncApplicationEventHandler>("Initializing uSync 3.4");
 
             var onUaaS = AppDomain.CurrentDomain.GetAssemblies()
                             .Any(a => a.FullName.StartsWith("Concorde.Messaging.Web"));
@@ -40,7 +42,7 @@ namespace Jumoo.uSync.BackOffice
             var version = Umbraco.Core.Configuration.UmbracoVersion.Current;
             if (version.Major > 7 || (version.Major == 7 && version.Minor >= 3))
             {
-                Setup();
+                Setup(applicationContext.ProfilingLogger.Logger, applicationContext.Services);
             }
             else
             {
@@ -48,16 +50,18 @@ namespace Jumoo.uSync.BackOffice
             }
         }
 
-        private void Setup()
+        private void Setup(ILogger logger, ServiceContext services)
         {
             Stopwatch sw = new Stopwatch();
             sw.Start();
 
             LogHelper.Info<uSyncApplicationEventHandler>("Firing up uSync");
 
+            var fs = FileSystemProviderManager.Current.GetUnderlyingFileSystemProvider("usync");
+
             // just to make the code readable...
             var uSyncBackOffice = uSyncBackOfficeContext.Instance;
-            uSyncBackOffice.Init();
+            uSyncBackOffice.Init(logger, fs, services);
 
             var settings = uSyncBackOffice.Configuration.Settings;
 

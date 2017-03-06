@@ -14,7 +14,7 @@ using System.IO;
 
 namespace Jumoo.uSync.IO.Managers
 {
-    public class LanguageManager : BaseSyncManager<ILanguage>, ISyncManager
+    public class LanguageManager : BaseSyncIOManager<ILanguage>, ISyncIOManager
     {
         public Guid Key => Guid.Parse("3734EC5C-FA0D-4B37-9D72-CCEEB0038B86");
         public string Name => "LanguageManager";

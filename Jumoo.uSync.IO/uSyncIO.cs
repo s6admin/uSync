@@ -19,9 +19,9 @@ namespace Jumoo.uSync.IO
     {
         public static uSyncIO Current;
 
-        public SortedList<int, ISyncManager> Managers { get; set; }
+        public SortedList<int, ISyncIOManager> Managers { get; set; }
 
-        public ISyncManager GetByType(Type itemType)
+        public ISyncIOManager GetByType(Type itemType)
         {
             var manager = Managers.Single(x => x.Value.ItemType == itemType);
             if (manager.Value == null)
@@ -46,13 +46,13 @@ namespace Jumoo.uSync.IO
             uSyncCoreContext uSyncContext,
             ServiceContext serviceContext)
         {
-            Managers = new SortedList<int, ISyncManager>();
+            Managers = new SortedList<int, ISyncIOManager>();
 
-            var types = TypeFinder.FindClassesOfType<ISyncManager>();
+            var types = TypeFinder.FindClassesOfType<ISyncIOManager>();
             foreach(var t in types)
             {
                 var instance = Activator.CreateInstance(t,
-                    logger, fileSystem, uSyncContext, serviceContext) as ISyncManager;
+                    logger, fileSystem, uSyncContext, serviceContext) as ISyncIOManager;
                 if (instance != null)
                 {
                     Managers.Add(instance.Priority, instance);

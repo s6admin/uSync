@@ -22,68 +22,6 @@ namespace Jumoo.uSync.BackOffice.Handlers
         public int Priority { get { return uSyncConstants.Priority.DictionaryItems; } }
         public string SyncFolder { get { return Constants.Packaging.DictionaryItemNodeName; } }
 
-        public override SyncAttempt<IDictionaryItem> Import(string filePath, bool force = false)
-        {
-            if (!System.IO.File.Exists(filePath))
-                throw new FileNotFoundException(filePath);
-
-            var node = XElement.Load(filePath);
-
-            return uSyncCoreContext.Instance.DictionarySerializer.DeSerialize(node, force);
-        }
-
-        public override uSyncAction DeleteItem(Guid key, string keyString)
-        {
-            var item = ApplicationContext.Current.Services.LocalizationService.GetDictionaryItemByKey(keyString);
-            if (item != null)
-            {
-                ApplicationContext.Current.Services.LocalizationService.Delete(item);
-
-                return uSyncAction.SetAction(true, keyString, typeof(IDictionaryItem), ChangeType.Delete);
-            }
-
-            return uSyncAction.Fail(keyString, typeof(IDictionaryItem), ChangeType.Delete, "Not found");
-        }
-
-        public IEnumerable<uSyncAction> ExportAll(string folder)
-        {
-            LogHelper.Info<DictionaryHandler>("Exporting all Dictionary Items");
-
-            List<uSyncAction> actions = new List<uSyncAction>();
-
-            var _languageService = ApplicationContext.Current.Services.LocalizationService;
-            foreach (var item in _languageService.GetRootDictionaryItems())
-            {
-                if (item != null)
-                    actions.Add(ExportToDisk(item, folder));
-            }
-            return actions;
-        }
-
-        public uSyncAction ExportToDisk(IDictionaryItem item, string folder)
-        {
-            if (item == null)
-                return uSyncAction.Fail(Path.GetFileName(folder), typeof(IDictionaryItem), "item not set");            
-
-            try
-            {
-                var attempt = uSyncCoreContext.Instance.DictionarySerializer.Serialize(item);
-                var filename = string.Empty;
-
-                if (attempt.Success)
-                {
-                    filename = uSyncIOHelper.SavePath(folder, SyncFolder, item.ItemKey.ToSafeAlias());
-                    uSyncIOHelper.SaveNode(attempt.Item, filename);
-                }
-                return uSyncActionHelper<XElement>.SetAction(attempt, filename);
-
-            }
-            catch (Exception ex)
-            {
-                return uSyncAction.Fail(item.ItemKey, item.GetType(), ChangeType.Export, ex);
-
-            }
-        }
 
         public void RegisterEvents()
         {
@@ -103,7 +41,7 @@ namespace Jumoo.uSync.BackOffice.Handlers
 
                 var item = ApplicationContext.Current.Services.LocalizationService.GetDictionaryItemByKey(save);
                 if (item != null)
-                    ExportToDisk(item, uSyncBackOfficeContext.Instance.Configuration.Settings.Folder);
+                    _ioManager.ExportItem(item.Key, uSyncBackOfficeContext.Instance.Configuration.Settings.Folder);
             }
 
             _deleteSaves.Clear();
@@ -148,7 +86,7 @@ namespace Jumoo.uSync.BackOffice.Handlers
                 LogHelper.Info<DictionaryHandler>("Save: {0}", () => item.ItemKey);
                 var topItem = GetTop(item.Key);
 
-                var action = ExportToDisk(topItem, uSyncBackOfficeContext.Instance.Configuration.Settings.Folder);
+                var action = _ioManager.ExportItem(item.Key, uSyncBackOfficeContext.Instance.Configuration.Settings.Folder);
                 if (action.Success)
                 {
                     // name checker only really works, when the export has the guid in it.
@@ -175,17 +113,5 @@ namespace Jumoo.uSync.BackOffice.Handlers
 
             return item;
         }
-
-        public override uSyncAction ReportItem(string file)
-        {
-            var node = XElement.Load(file);
-            var update = uSyncCoreContext.Instance.DictionarySerializer.IsUpdate(node);
-            var action = uSyncActionHelper<IDictionaryItem>.ReportAction(update, node.NameFromNode(), "Dictionary Items often get their order mixed up");
-            if (action.Change > ChangeType.NoChange)
-                action.Details = ((ISyncChangeDetail)uSyncCoreContext.Instance.DictionarySerializer).GetChanges(node);
-
-            return action;
-        }
-
     }
 }

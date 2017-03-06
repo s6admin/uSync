@@ -11,21 +11,21 @@ using Umbraco.Core.Logging;
 using Umbraco.Core.Models;
 using Umbraco.Core.Services;
 using System.IO;
+using Jumoo.uSync.Core.Interfaces;
 
-namespace Jumoo.uSync.IO.Managers
+namespace Jumoo.uSync.Core.IO
 {
-    public class DictionaryManager : BaseSyncIOManager<IDictionaryItem>, ISyncIOManager
+    public class LanguageManager : BaseSyncIOManager<ILanguage>, ISyncIOManager
     {
-        public Guid Key => Guid.Parse("3E09254D-EB51-4C02-9A72-4C7D4C0480FC");
-        public string Name => "DictionaryManager";
+        public Guid Key => Guid.Parse("3734EC5C-FA0D-4B37-9D72-CCEEB0038B86");
+        public string Name => "LanguageManager";
         public int Priority { get; set; }
         public string SyncFolder { get; set; }
 
         private readonly ILocalizationService localizationService;
-        public Type ItemType => typeof(IDictionaryItem);
+        public Type ItemType => typeof(ILanguage);
 
-
-        public DictionaryManager(
+        public LanguageManager(
             ILogger Logger, 
             IFileSystem FileSystem, 
             uSyncCoreContext USyncContext, 
@@ -37,16 +37,16 @@ namespace Jumoo.uSync.IO.Managers
             localizationService = serviceContext.LocalizationService;
         }
 
-        public override SyncAttempt<IDictionaryItem> ImportItem(string file, bool force)
+        public override SyncAttempt<ILanguage> ImportItem(string file, bool force)
         {
             if (!fileSystem.FileExists(file))
                 throw new System.IO.FileNotFoundException();
 
             var node = GetNode(file);
             if (node != null)
-                return uSyncContext.DictionarySerializer.DeSerialize(node, force);
+                return uSyncContext.LanguageSerializer.DeSerialize(node, force);
 
-            return SyncAttempt<IDictionaryItem>.Fail(file, ChangeType.ImportFail);
+            return SyncAttempt<ILanguage>.Fail(file, ChangeType.ImportFail);
         }
 
 
@@ -54,44 +54,48 @@ namespace Jumoo.uSync.IO.Managers
         {
             if (key != Guid.Empty)
             {
-                var item = localizationService.GetDictionaryItemById(key);
+                var entity = entityService.GetByKey(key);
+                var item = localizationService.GetLanguageById(entity.Id);
 
                 if (item != null)
                 {
                     localizationService.Delete(item);
-                    return uSyncAction.SetAction(true, name, typeof(IDictionaryItem), ChangeType.Delete);
+                    return uSyncAction.SetAction(true, name, typeof(ILanguage), ChangeType.Delete);
                 }
             }
-            return uSyncAction.Fail(name, typeof(IDictionaryItem), ChangeType.Delete, "Not found");
+            return uSyncAction.Fail(name, typeof(ILanguage), ChangeType.Delete, "Not found");
+                   
         }
 
         public override IEnumerable<uSyncAction> Export(string folder)
         {
             List<uSyncAction> actions = new List<uSyncAction>();
 
-            foreach(var item in localizationService.GetRootDictionaryItems())
+            foreach(var item in localizationService.GetAllLanguages())
             {
                 if (item != null)
-                    ExportDictionary(item, folder);
+                    actions.Add(ExportLanguage(item, folder));
             }
+
 
             return actions;
         }
 
         public override uSyncAction ExportItem(Guid key, string folder)
         {
-            var item = localizationService.GetDictionaryItemById(key);
+            var entity = entityService.GetByKey(key);
+            var item = localizationService.GetLanguageById(entity.Id);
             if (item == null)
-                return uSyncAction.Fail(Path.GetFileName(folder), typeof(IDictionaryItem), "Item not set");
+                return uSyncAction.Fail(Path.GetFileName(folder), typeof(ILanguage), "Item not set");
 
-            return ExportDictionary(item, folder);
+            return ExportLanguage(item, folder);
         }
 
-        public uSyncAction ExportDictionary(IDictionaryItem item, string folder)
+        public uSyncAction ExportLanguage(ILanguage item, string folder)
         { 
             try
             {
-                var attempt = uSyncContext.DictionarySerializer.Serialize(item);
+                var attempt = uSyncContext.LanguageSerializer.Serialize(item);
                 var filename = string.Empty;
                 if (attempt.Success)
                 {
@@ -102,19 +106,19 @@ namespace Jumoo.uSync.IO.Managers
             }
             catch(Exception ex)
             {
-                logger.Warn<DataTypeManager>("Error saving dictionary item {0}", () => ex.ToString());
-                return uSyncAction.Fail(item.ItemKey, item.GetType(), ChangeType.Export, ex);
+                logger.Warn<LanguageManager>("Error saving Language type {0}", () => ex.ToString());
+                return uSyncAction.Fail(item.CultureName, item.GetType(), ChangeType.Export, ex);
             }
         }
 
         public override uSyncAction ReportItem(string file)
         {
             var node = GetNode(file);
-            var update = uSyncContext.DictionarySerializer.IsUpdate(node);
+            var update = uSyncContext.LanguageSerializer.IsUpdate(node);
 
-            var action = uSyncActionHelper<IDictionaryItem>.ReportAction(update, node.NameFromNode());
+            var action = uSyncActionHelper<ILanguage>.ReportAction(update, node.NameFromNode());
             if (action.Change > ChangeType.NoChange)
-                action.Details = ((ISyncChangeDetail)uSyncContext.DictionarySerializer).GetChanges(node);
+                action.Details = ((ISyncChangeDetail)uSyncContext.LanguageSerializer).GetChanges(node);
 
             return action;
         }

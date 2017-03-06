@@ -256,8 +256,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Interfaces\ISyncManager.cs" />
-    <Compile Include="Managers\BaseSyncManager.cs" />
+    <Compile Include="Interfaces\ISyncIOManager.cs" />
+    <Compile Include="Managers\BaseSyncIOManager.cs" />
     <Compile Include="Managers\LanguageHandler.cs" />
     <Compile Include="Managers\TemplateManager.cs" />
     <Compile Include="Managers\MarcoManager.cs" />

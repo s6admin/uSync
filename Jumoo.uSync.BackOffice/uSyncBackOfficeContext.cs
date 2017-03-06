@@ -11,6 +11,8 @@
     using System.Collections.Specialized;
     using System.Diagnostics;
     using System.Threading;
+    using Umbraco.Core.IO;
+    using Umbraco.Core.Services;
 
     public class uSyncBackOfficeContext
     {
@@ -46,17 +48,22 @@
             get { return _config ?? (_config = new uSyncBackOfficeConfig()); }
         }
 
+        [Obsolete("Pass parameters instead")]
         public void Init()
         {
-            uSyncCoreContext.Instance.Init();
-
-            LoadAssemblyHandlers();
-
-            _config = new uSyncBackOfficeConfig();
-
-            Tracker = new Helpers.ActionTracker(_config.Settings.MappedFolder());
+            Init(
+                ApplicationContext.Current.ProfilingLogger.Logger,
+                FileSystemProviderManager.Current.GetUnderlyingFileSystemProvider("usync"),
+                ApplicationContext.Current.Services);
         }
 
+        public void Init(ILogger logger, IFileSystem fileSystem, ServiceContext services)
+        {
+            uSyncCoreContext.EnsureContext(logger, fileSystem, services);
+            LoadAssemblyHandlers();
+            _config = new uSyncBackOfficeConfig();
+            Tracker = new Helpers.ActionTracker(_config.Settings.MappedFolder());
+        }
 
         private void LoadAssemblyHandlers()
         {

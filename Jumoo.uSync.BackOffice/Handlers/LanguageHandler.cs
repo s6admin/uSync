@@ -20,76 +20,6 @@
         public int Priority { get { return uSyncConstants.Priority.Languages; } }
         public string SyncFolder { get { return Constants.Packaging.LanguagesNodeName; } }
 
-        public override SyncAttempt<ILanguage> Import(string filePath, bool force = false)
-        {
-            if (!System.IO.File.Exists(filePath))
-                throw new FileNotFoundException(filePath);
-
-            var node = XElement.Load(filePath);
-            var attempt = uSyncCoreContext.Instance.LanguageSerializer.DeSerialize(node, force);
-
-            if (attempt.Success && attempt.Item != null)
-            {
-                // if it worked take any deletes we may have out of the sync file (we do this because language syncs are done by name)
-                uSyncBackOfficeContext.Instance.Tracker.RemoveActions(attempt.Item.CultureName, typeof(ILanguage));
-            }
-
-            return attempt;
-        }
-
-        public override uSyncAction DeleteItem(Guid key, string keyString)
-        {
-            var item = ApplicationContext.Current.Services.LocalizationService.GetLanguageByIsoCode(keyString);
-            if (item != null)
-            {
-                ApplicationContext.Current.Services.LocalizationService.Delete(item);
-
-                return uSyncAction.SetAction(true, keyString, typeof(ILanguage), ChangeType.Delete);
-            }
-
-            return uSyncAction.Fail(keyString, typeof(ILanguage), ChangeType.Delete, "Not found");
-        }
-
-        public IEnumerable<uSyncAction> ExportAll(string folder)
-        {
-            List<uSyncAction> actions = new List<uSyncAction>();
-
-            var _languageService = ApplicationContext.Current.Services.LocalizationService;
-            foreach (var item in _languageService.GetAllLanguages())
-            {
-                if (item != null)
-                    actions.Add(ExportToDisk(item, folder));
-            }
-            return actions;
-        }
-
-        public uSyncAction ExportToDisk(ILanguage item, string folder)
-        {
-
-            LogHelper.Info<LanguageHandler>("Exporting all Langauges");
-
-            if (item == null)
-                return uSyncAction.Fail(Path.GetFileName(folder), typeof(ILanguage), "item not set");
-
-            try
-            {
-                var attempt = uSyncCoreContext.Instance.LanguageSerializer.Serialize(item);
-                var filename = string.Empty;
-
-                if (attempt.Success)
-                {
-                    filename = uSyncIOHelper.SavePath(folder, SyncFolder, item.CultureName.ToSafeAlias());
-                    uSyncIOHelper.SaveNode(attempt.Item,filename);
-                }
-                return uSyncActionHelper<XElement>.SetAction(attempt, filename);
-
-            }
-            catch (Exception ex)
-            {
-                return uSyncAction.Fail(item.CultureName, item.GetType(), ChangeType.Export, ex);
-
-            }
-        }
 
         public void RegisterEvents()
         {
@@ -106,7 +36,6 @@
             {
                 LogHelper.Info<MacroHandler>("Delete: Deleting uSync File for item: {0}", () => item.CultureName);
                 uSyncIOHelper.ArchiveRelativeFile(SyncFolder, item.CultureName.ToSafeAlias());
-
                 uSyncBackOfficeContext.Instance.Tracker.AddAction(SyncActionType.Delete, item.CultureName, typeof(ILanguage));
             }
         }
@@ -119,22 +48,9 @@
             foreach (var item in e.SavedEntities)
             {
                 LogHelper.Info<LanguageHandler>("Save: Saving uSync file for item: {0}", () => item.CultureName);
-                ExportToDisk(item, uSyncBackOfficeContext.Instance.Configuration.Settings.Folder);
-
+                _ioManager.ExportItem(item.Key, uSyncBackOfficeContext.Instance.Configuration.Settings.Folder);
                 uSyncBackOfficeContext.Instance.Tracker.RemoveActions(item.CultureName, typeof(ILanguage));
             }
         }
-
-        public override uSyncAction ReportItem(string file)
-        {
-            var node = XElement.Load(file);
-            var update = uSyncCoreContext.Instance.LanguageSerializer.IsUpdate(node);
-            var action = uSyncActionHelper<ILanguage>.ReportAction(update, node.NameFromNode());
-            if (action.Change > ChangeType.NoChange)
-                action.Details = ((ISyncChangeDetail)uSyncCoreContext.Instance.LanguageSerializer).GetChanges(node);
-
-            return action;
-        }
-
     }
 }

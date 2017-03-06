@@ -11,8 +11,9 @@ using Umbraco.Core.Logging;
 using Umbraco.Core.Models;
 using Umbraco.Core.Services;
 using System.IO;
+using Jumoo.uSync.Core.Interfaces;
 
-namespace Jumoo.uSync.IO.Managers
+namespace Jumoo.uSync.Core.IO
 {
     public class ContentTypeManager : BaseSyncIOManager<IContentType>, ISyncIOManager
     {
@@ -48,24 +49,6 @@ namespace Jumoo.uSync.IO.Managers
             return SyncAttempt<IContentType>.Fail(file, ChangeType.ImportFail);
         }
 
-
-        public override void ImportItemAgain(string file, IContentType item)
-        {
-            if (!fileSystem.FileExists(file))
-                throw new System.IO.FileNotFoundException();
-
-            var node = GetNode(file);
-            uSyncContext.ContentTypeSerializer.DesearlizeSecondPass(item, node);
-        }
-
-        public IEnumerable<uSyncAction> PostImport(string folder, IEnumerable<uSyncAction> actions)
-        {
-            if (actions.Any(x => x.ItemType == typeof(IContentType)))
-            {
-                return CleanEmptyContainers(folder, -1);
-            }
-            return null;
-        }
 
         public override uSyncAction DeleteItem(Guid key, string name)
         {
@@ -117,6 +100,15 @@ namespace Jumoo.uSync.IO.Managers
                 action.Details = ((ISyncChangeDetail)uSyncContext.ContentTypeSerializer).GetChanges(node);
 
             return action;
+        }
+
+        public override IEnumerable<uSyncAction> PostImport(string folder, IEnumerable<uSyncAction> actions)
+        {
+            if (actions.Any() && actions.Any(x => x.ItemType == typeof(IContentType)))
+            {
+                return CleanEmptyContainers(folder, -1);
+            }
+            return null;
         }
 
         protected override bool RemoveContainer(int id)

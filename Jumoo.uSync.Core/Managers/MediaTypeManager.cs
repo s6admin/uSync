@@ -11,56 +11,58 @@ using Umbraco.Core.Logging;
 using Umbraco.Core.Models;
 using Umbraco.Core.Services;
 using System.IO;
+using Jumoo.uSync.Core.Interfaces;
 
-namespace Jumoo.uSync.IO.Managers
+namespace Jumoo.uSync.Core.IO
 {
-    public class ContentTypeManager : BaseSyncIOManager<IContentType>, ISyncIOManager
+    public class MediaTypeManager : BaseSyncIOManager<IMediaType>, ISyncIOManager
     {
-        public Guid Key => Guid.Parse("588C2A64-4A76-4493-91B6-8CB8DCF21EC6");
-        public string Name => "ContentTypeManager";
+        public Guid Key => Guid.Parse("AA8B9C7D-9346-4F25-B76D-E2AEA2F7F6CF");
+        public string Name => "MediaTypeManager";
         public int Priority { get; set; }
         public string SyncFolder { get; set; }
-        public Type ItemType => typeof(IContentType);
 
         private readonly IContentTypeService contentTypeService;
+        public Type ItemType => typeof(IMediaType);
 
-        public ContentTypeManager(
+
+        public MediaTypeManager(
             ILogger Logger, 
             IFileSystem FileSystem, 
             uSyncCoreContext USyncContext, 
             ServiceContext serviceContext) 
             : base(Logger, FileSystem, USyncContext, serviceContext)
         {
-            objectType = UmbracoObjectTypes.DocumentType;
-            containerType = UmbracoObjectTypes.DocumentTypeContainer;
+            objectType = UmbracoObjectTypes.MediaType;
+            containerType = UmbracoObjectTypes.MediaTypeContainer;
             contentTypeService = serviceContext.ContentTypeService;
         }
 
-        public override SyncAttempt<IContentType> ImportItem(string file, bool force)
+        public override SyncAttempt<IMediaType> ImportItem(string file, bool force)
         {
             if (!fileSystem.FileExists(file))
                 throw new System.IO.FileNotFoundException();
 
             var node = GetNode(file);
             if (node != null)
-                return uSyncContext.ContentTypeSerializer.DeSerialize(node, force);
+                return uSyncContext.MediaTypeSerializer.DeSerialize(node, force);
 
-            return SyncAttempt<IContentType>.Fail(file, ChangeType.ImportFail);
+            return SyncAttempt<IMediaType>.Fail(file, ChangeType.ImportFail);
         }
 
 
-        public override void ImportItemAgain(string file, IContentType item)
+        public override void ImportItemAgain(string file, IMediaType item)
         {
             if (!fileSystem.FileExists(file))
                 throw new System.IO.FileNotFoundException();
 
             var node = GetNode(file);
-            uSyncContext.ContentTypeSerializer.DesearlizeSecondPass(item, node);
+            uSyncContext.MediaTypeSerializer.DesearlizeSecondPass(item, node);
         }
 
-        public IEnumerable<uSyncAction> PostImport(string folder, IEnumerable<uSyncAction> actions)
+        public override IEnumerable<uSyncAction> PostImport(string folder, IEnumerable<uSyncAction> actions)
         {
-            if (actions.Any(x => x.ItemType == typeof(IContentType)))
+            if (actions.Any(x => x.ItemType == typeof(IMediaType)))
             {
                 return CleanEmptyContainers(folder, -1);
             }
@@ -71,27 +73,27 @@ namespace Jumoo.uSync.IO.Managers
         {
             if (key != Guid.Empty)
             {
-                var item = contentTypeService.GetContentType(key);
+                var item = contentTypeService.GetMediaType(key);
 
                 if (item != null)
                 {
                     contentTypeService.Delete(item);
-                    return uSyncAction.SetAction(true, name, typeof(IContentType), ChangeType.Delete);
+                    return uSyncAction.SetAction(true, name, typeof(IMediaType), ChangeType.Delete);
                 }
             }
-            return uSyncAction.Fail(name, typeof(IContentType), ChangeType.Delete, "Not found");
+            return uSyncAction.Fail(name, typeof(IMediaType), ChangeType.Delete, "Not found");
                    
         }
 
         public override uSyncAction ExportItem(Guid key, string folder)
         {
-            var item = contentTypeService.GetContentType(key);
+            var item = contentTypeService.GetMediaType(key);
             if (item == null)
-                return uSyncAction.Fail(Path.GetFileName(folder), typeof(IContentType), "Item not set");
+                return uSyncAction.Fail(Path.GetFileName(folder), typeof(IMediaType), "Item not set");
 
             try
             {
-                var attempt = uSyncContext.ContentTypeSerializer.Serialize(item);
+                var attempt = uSyncContext.MediaTypeSerializer.Serialize(item);
                 var filename = string.Empty;
                 if (attempt.Success)
                 {
@@ -110,18 +112,18 @@ namespace Jumoo.uSync.IO.Managers
         public override uSyncAction ReportItem(string file)
         {
             var node = GetNode(file);
-            var update = uSyncContext.ContentSerializer.IsUpdate(node);
+            var update = uSyncContext.MediaTypeSerializer.IsUpdate(node);
 
-            var action = uSyncActionHelper<IContentType>.ReportAction(update, node.NameFromNode());
+            var action = uSyncActionHelper<IMediaType>.ReportAction(update, node.NameFromNode());
             if (action.Change > ChangeType.NoChange)
-                action.Details = ((ISyncChangeDetail)uSyncContext.ContentTypeSerializer).GetChanges(node);
+                action.Details = ((ISyncChangeDetail)uSyncContext.MediaTypeSerializer).GetChanges(node);
 
             return action;
         }
 
         protected override bool RemoveContainer(int id)
         {
-            var attempt = contentTypeService.DeleteContentTypeContainer(id);
+            var attempt = contentTypeService.DeleteMediaTypeContainer(id);
             return attempt.Success;
         }
 

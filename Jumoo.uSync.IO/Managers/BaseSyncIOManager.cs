@@ -15,7 +15,7 @@ using Umbraco.Core;
 
 namespace Jumoo.uSync.IO.Managers
 {
-    public abstract class BaseSyncManager<TEntity>
+    public abstract class BaseSyncIOManager<TEntity>
     {
         protected bool requiresPostProcessing = false; 
         protected ILogger logger;
@@ -25,7 +25,7 @@ namespace Jumoo.uSync.IO.Managers
         protected UmbracoObjectTypes objectType;
         protected UmbracoObjectTypes containerType;
 
-        public BaseSyncManager(
+        public BaseSyncIOManager(
             ILogger Logger, 
             IFileSystem FileSystem, 
             uSyncCoreContext USyncContext,

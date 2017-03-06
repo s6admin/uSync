@@ -11,8 +11,9 @@ using Umbraco.Core.Logging;
 using Umbraco.Core.Models;
 using Umbraco.Core.Services;
 using System.IO;
+using Jumoo.uSync.Core.Interfaces;
 
-namespace Jumoo.uSync.IO.Managers
+namespace Jumoo.uSync.Core.IO
 {
     public class MacroManager : BaseSyncIOManager<IMacro>, ISyncIOManager
     {

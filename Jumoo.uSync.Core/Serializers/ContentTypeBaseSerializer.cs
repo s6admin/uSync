@@ -124,13 +124,13 @@ namespace Jumoo.uSync.Core.Serializers
 
                 if (key != Guid.Empty)
                 {
-                    LogHelper.Debug<uSync.Core.Events>("Using key to find structure element");
+                    LogHelper.Debug<Events>("Using key to find structure element");
                     contentBaseItem = LookupByKey(key);
                 }
 
                 if (baseItem == null && !string.IsNullOrEmpty(alias))
                 {
-                    LogHelper.Debug<uSync.Core.Events>("Fallback Alias lookup");
+                    LogHelper.Debug<Events>("Fallback Alias lookup");
                     contentBaseItem = LookupByAlias(alias);
                 }
 
@@ -333,14 +333,14 @@ namespace Jumoo.uSync.Core.Serializers
 
                 if (propertyNode == null)
                 {
-                    LogHelper.Debug<uSync.Core.Events>("Remove Check: Looking up property type by alias {0} to stop accedental removal", ()=> property.Alias);
+                    LogHelper.Debug<Events>("Remove Check: Looking up property type by alias {0} to stop accedental removal", ()=> property.Alias);
                     propertyNode = propertyNodes
                         .SingleOrDefault(x => x.Element("Alias").Value == property.Alias);
                 }
 
                 if (propertyNode == null)
                 {
-                    LogHelper.Debug<uSync.Core.Events>("Removing Property: (no match on system) {0}", () => property.Alias);
+                    LogHelper.Debug<Events>("Removing Property: (no match on system) {0}", () => property.Alias);
                     propertiesToRemove.Add(property.Alias);
                 }
             }

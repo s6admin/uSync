@@ -10,7 +10,7 @@ namespace Jumoo.uSync.IO
     /// <summary>
     ///  an interface to handler the io of usyncness, 
     /// </summary>
-    public interface ISyncManager
+    public interface ISyncIOManager
     {
 
         Guid Key { get;  }

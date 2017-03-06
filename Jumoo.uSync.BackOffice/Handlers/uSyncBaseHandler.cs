@@ -15,13 +15,17 @@
     using Umbraco.Core.Models;
     using System.Xml.Linq;
     using Core.Extensions;
+    using Core.Interfaces;
 
     abstract public class uSyncBaseHandler<T>
     {
-        bool _useShortName; 
+        bool _useShortName;
+        protected ISyncIOManager _ioManager;
 
         public uSyncBaseHandler()
         {
+            _ioManager = uSyncCoreContext.Instance.GetIOManager(typeof(T));
+
             // short Id Setting, means we save with id.config not {{name}}.config
             _useShortName = uSyncBackOfficeContext.Instance.Configuration.Settings.UseShortIdNames;
         }
@@ -31,97 +35,23 @@
         // also be post processed. 
         internal bool RequiresPostProcessing = false;
 
-        abstract public SyncAttempt<T> Import(string filePath, bool force = false);
+        // abstract public SyncAttempt<T> Import(string filePath, bool force = false);
 
         public IEnumerable<uSyncAction> ImportAll(string folder, bool force)
         {
-            LogHelper.Info<Logging>("Running Import: {0}", () => Path.GetFileName(folder));
-            List<uSyncAction> actions = new List<uSyncAction>();
-
-            Dictionary<string, T> updates = new Dictionary<string, T>();
-
-            // for a non-force sync, we use the actions to process deletes.
-            // when it's a force, then we delete anything that is in umbraco
-            // that isn't in our folder??
-            // if (!force)
-            //{
-            actions.AddRange(ProcessActions());
-            //}
-
-            actions.AddRange(ImportFolder(folder, force, updates));
-
-
-            if (updates.Any())
-            {
-                foreach (var update in updates)
-                {
-                    ImportSecondPass(update.Key, update.Value);
-                }
-            }
-
-            LogHelper.Info<Logging>("Handler Import Complete: {0} Items {1} changes {2} failures",
-                () => actions.Count(),
-                () => actions.Count(x => x.Change > ChangeType.NoChange),
-                () => actions.Count(x => x.Change > ChangeType.Fail));
-
-            return actions; 
+            return _ioManager.Import(folder, force);
         }
 
-        private IEnumerable<uSyncAction> ImportFolder(string folder, bool force, Dictionary<string, T> updates)
+        public uSyncAction DeleteItem(Guid key, string keyString)
         {
-            List<uSyncAction> actions = new List<uSyncAction>();
-
-            string mappedfolder = Umbraco.Core.IO.IOHelper.MapPath(folder);
-
-            if (Directory.Exists(mappedfolder))
-            {
-                foreach (string file in Directory.GetFiles(mappedfolder, "*.config"))
-                {
-                    var attempt = Import(file, force);
-                    if (attempt.Success && attempt.Item != null)
-                    {
-                        updates.Add(file, attempt.Item);
-                    }
-
-                    actions.Add(uSyncActionHelper<T>.SetAction(attempt, file, RequiresPostProcessing));
-                }
-
-                foreach (var children in Directory.GetDirectories(mappedfolder))
-                {
-                    actions.AddRange(ImportFolder(children, force, updates));
-                }
-            }
-
-            return actions; 
+            return _ioManager.DeleteItem(key, keyString);
         }
 
-        private IEnumerable<uSyncAction> ProcessActions()
+        public IEnumerable<uSyncAction> ExportAll(string folder)
         {
-            List<uSyncAction> syncActions = new List<uSyncAction>();
-
-            var actions = uSyncBackOfficeContext.Instance.Tracker.GetActions(typeof(T));
-
-            if (actions != null && actions.Any())
-            {
-                foreach(var action in actions)
-                {
-                    LogHelper.Info<Logging>("Processing a Delete: {0}", () => action.TypeName);
-                    switch (action.Action)
-                    {
-                        case SyncActionType.Delete:
-                            syncActions.Add(DeleteItem(action.Key, action.Name));
-                            break;
-                    }
-                }
-            }
-
-            return syncActions;
+            return _ioManager.Export(folder);
         }
 
-        virtual public uSyncAction DeleteItem(Guid key, string keyString)
-        {
-            return new uSyncAction();
-        }
 
         virtual public string GetItemPath(T item)
         {
@@ -169,28 +99,13 @@
         /// <returns></returns>
         public IEnumerable<uSyncAction> Report(string folder)
         {
-            List<uSyncAction> actions = new List<uSyncAction>();
-
-            string mappedfolder = Umbraco.Core.IO.IOHelper.MapPath(folder);
-
-            if (Directory.Exists(mappedfolder))
-            {
-                foreach (string file in Directory.GetFiles(mappedfolder, "*.config"))
-                {
-                    actions.Add(ReportItem(file));
-
-                }
-
-                foreach (var children in Directory.GetDirectories(mappedfolder))
-                {
-                    actions.AddRange(Report(children));
-                }
-            }
-
-            return actions;
+            return _ioManager.Report(folder);
         }
 
-        abstract public uSyncAction ReportItem(string file);
+        public uSyncAction ReportItem(string file)
+        {
+            return _ioManager.ReportItem(file);
+        }
 
         protected string GetItemFileName(IUmbracoEntity item)
         {
