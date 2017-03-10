@@ -1,0 +1,84 @@
+﻿<div ng-controller="uSyncUploadController">
+    <p>
+       upload a zipped version of a usync file and have it processed here...
+    </p>
+
+    <div class="upload">
+        <div class="umb-el-wrap ">
+            <label class="control-label">Name</label>
+            <div class="controls controls-row">
+                <input type="text" ng-model="name" name="name" />
+            </div>
+        </div>
+        <div class="umb-el-wrap ">
+            <label class="control-label">Zip</label>
+            <div class="controls controls-row">
+                <div id="file" class="btn btn-info"
+                     ng-model="file"
+                     name="file"
+                     ngf-select
+                     ngf-max-size="40MB"
+                     ngf-min-height="100"
+                     ngf-resize="{width: 100, height: 100}" no-dirty-check>Select</div>
+                <span>{{file.name}}</span>
+            </div>
+        </div>
+
+        <button ng-disabled="disabled" ng-click="saveFiles()" class="btn btn-primary">Upload File</button>
+    </div>
+
+    <h3>Current Uploads</h3>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr ng-repeat="upload in uploads">
+                <td>{{upload}}</td>
+                <td>
+                    <button class="btn btn-sm btn-info"
+                            ng-disabled="disabled" ng-click="process(upload)">
+                        Process
+                    </button>
+                    <button class="btn btn-sm btn-danger"
+                            ng-disabled="disabled" ng-click="delete(upload)">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div ng-show="processing">
+        <ul class="usync-progress animated -half-second" style="list-style: none;position:relative;">
+            <li class="umb-load-indicator__bubble"></li>
+            <li class="umb-load-indicator__bubble"></li>
+            <li class="umb-load-indicator__bubble"></li>
+        </ul>
+    </div>
+
+    <div ng-show="changes.length > 0 && !processing">
+        <h4>Processed {{changes.length}} items</h4>
+        <table class="table">
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Change</th>
+                <th></th>
+            </tr>
+            <tbody ng-repeat="change in changes">
+                <tr ng-class="{'text-warning' : !change.Success, 'muted' : change.Change == 0 }" ng-show="showChange(change.Change, change.Success)">
+                    <td>{{change.Name}}</td>
+                    <td>{{getChangeName(change.Change)}}</td>
+                    <td>{{getTypeName(change.ItemType)}}</td>
+                    <td>
+                        {{change.Message}}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>

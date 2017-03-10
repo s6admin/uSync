@@ -1,0 +1,7 @@
+﻿{
+	javascript: [
+		"~/App_Plugins/uSync.Uploads/ng-file-upload-shim.js",
+		"~/App_Plugins/uSync.Uploads/ng-file-upload.min.js",
+		"~/App_Plugins/uSync.Uploads/uSyncUploadController.js"
+	]
+}
