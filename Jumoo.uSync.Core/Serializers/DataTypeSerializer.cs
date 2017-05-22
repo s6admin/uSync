@@ -16,7 +16,6 @@ using Jumoo.uSync.Core.Extensions;
 using Umbraco.Core.Logging;
 using System.Web;
 
-
 namespace Jumoo.uSync.Core.Serializers
 {
     public class DataTypeSerializer : DataTypeSyncBaseSerializer, ISyncChangeDetail
@@ -49,7 +48,7 @@ namespace Jumoo.uSync.Core.Serializers
         private SyncAttempt<IDataTypeDefinition> DeserializeItem(XElement node, IDataTypeDefinition item)
         {
             // pre import
-            var mappedNode = DeserializeGetMappedValues(node);
+
             Guid key = node.Attribute("Key").ValueOrDefault(Guid.Empty);
 
             var name = node.Attribute("Name").ValueOrDefault(string.Empty);
@@ -177,30 +176,44 @@ namespace Jumoo.uSync.Core.Serializers
             return DeserializeItem(node, item);
         }
 
-        private XElement DeserializeGetMappedValues(XElement node)
+        private XElement DeserializeGetMappedValues(XElement node, IDictionary<string, PreValue> preValues )
         {
             XElement nodeCopy = new XElement(node);
-            var id = node.Attribute("Id").ValueOrDefault(string.Empty);
+            var id = nodeCopy.Attribute("Id").ValueOrDefault(string.Empty);
+
+            LogHelper.Debug<DataTypeSerializer>("Mapping Guids {0}", ()=> id);
 
             var mapper = LoadMapper(nodeCopy, id);
 
-            var preValues = nodeCopy.Element("PreValues");
+            var preValuesElements = nodeCopy.Element("PreValues");
 
-            if (mapper != null && preValues != null && preValues.HasElements)
+            // value use to be an attrib - now it's a value
+            foreach (var legacyElement in preValuesElements.Descendants().Where(x => x.Attribute("Value") != null))
             {
-                foreach (var preValue in preValues.Descendants()
-                                            .Where(x => x.Attribute("MapGuid") != null)
+                legacyElement.Value = legacyElement.Attribute("Value").Value;
+            }
+
+            if (mapper != null && preValuesElements != null && preValuesElements.HasElements)
+            {
+                foreach (var preValueNode in preValuesElements.Descendants()
+                                            .Where(x => x.Attribute("MapGuid") != null && x.Attribute("Alias") != null)
                                             .ToList())
                 {
+                    var alias = preValueNode.Attribute("Alias").Value;
 
-                    var value = mapper.MapToId(preValue);
-
-                    if (!string.IsNullOrEmpty(value))
+                    if (preValues.ContainsKey(alias))
                     {
-                        preValue.Attribute("Value").Value = value;
-                    }
+                        var value = mapper.MapToId(preValueNode, preValues[alias] );
 
-                    preValue.Attribute("MapGuid").Remove();
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                            LogHelper.Debug<DataTypeSerializer>("Setting Mapped Value: {0}", () => value);
+                            preValueNode.Value = value;
+                            // preValueNode.Attribute("Value").Value = value;
+                        }
+
+                        preValueNode.Attribute("MapGuid").Remove();
+                    }
                 }
             }
 
@@ -212,14 +225,14 @@ namespace Jumoo.uSync.Core.Serializers
 
         private void DeserializeUpdatePreValues(IDataTypeDefinition item, XElement node)
         {
-            LogHelper.Debug<DataTypeSerializer>("Deserializing DataType PreValues: {0}", ()=> item.Name);
+            var itemPreValues = _dataTypeService.GetPreValuesCollectionByDataTypeId(item.Id)
+                                    .FormatAsDictionary();
 
-            var preValueRootNode = node.Element("PreValues");
+            var mappedNode = DeserializeGetMappedValues(node, itemPreValues);
+
+            var preValueRootNode = mappedNode.Element("PreValues");
             if (preValueRootNode != null)
             {
-                var itemPreValues = _dataTypeService.GetPreValuesCollectionByDataTypeId(item.Id)
-                                        .FormatAsDictionary();
-
                 List<string> preValsToRemove = new List<string>();
 
                 foreach (var preValue in itemPreValues)
@@ -232,7 +245,10 @@ namespace Jumoo.uSync.Core.Serializers
                     if (preValNode != null)
                     {
                         // set the value of preValue value to the value of the value attribute :)
-                        preValue.Value.Value = preValNode.Attribute("Value").Value;
+                        if (preValue.Value.Value != preValNode.Value)
+                        {
+                            preValue.Value.Value = preValNode.Value;
+                        }
                     }
                     else
                     {
@@ -258,31 +274,18 @@ namespace Jumoo.uSync.Core.Serializers
                 foreach (var nodeValue in preValueRootNode.Elements("PreValue"))
                 {
                     var alias = nodeValue.Attribute("Alias").ValueOrDefault(string.Empty);
-                    var value = nodeValue.Attribute("Value").ValueOrDefault(string.Empty);
+                    var value = nodeValue.ValueOrDefault(string.Empty);
 
                     if (!string.IsNullOrEmpty(alias))
                     {
                         if (!itemPreValues.ContainsKey(alias))
                         {
-                            LogHelper.Debug<DataTypeSerializer>("Adding PreValue {0} for {1}", () => alias, () => item.Name);
                             itemPreValues.Add(alias, new PreValue(value));
                         }
                     }
                 }
 
                 _dataTypeService.SavePreValues(item, itemPreValues);
-
-                /*
-                var valuesSansKeys = preValueRootNode.Elements("PreValue")
-                                        .Where(x => ((string)x.Attribute("Alias")).IsNullOrWhiteSpace() == false)
-                                        .Select(x => x.Attribute("Value").Value);
-
-                /// this is marked as obsolete? but don't some prevalues still have no keys?
-                if (valuesSansKeys.Any())
-                {
-                    _dataTypeService.SavePreValues(item.Id, valuesSansKeys);
-                }
-                */
             }
         }
 
@@ -336,8 +339,8 @@ namespace Jumoo.uSync.Core.Serializers
                 var preValueValue = preValue.Value;
 
                 XElement preValueNode = new XElement("PreValue",
-                    new XAttribute("Id", preValue.Id.ToString()),
-                    new XAttribute("Value", String.IsNullOrEmpty(preValueValue) ? "" : preValueValue));
+                    new XAttribute("Id", preValue.Id.ToString()));
+                preValueNode.Add(new XCData(String.IsNullOrEmpty(preValueValue) ? "" : preValueValue));
 
                 if (!itemPreValuePair.Key.StartsWith("zzzuSync"))
                     preValueNode.Add(new XAttribute("Alias", itemPreValuePair.Key));
@@ -357,7 +360,6 @@ namespace Jumoo.uSync.Core.Serializers
 
                 nodePreValues.Add(preValueNode);
             }
-
             return nodePreValues;
         }
 
