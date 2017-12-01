@@ -134,6 +134,10 @@
 
             foreach (var item in e.SavedEntities)
             {
+                if (RemoveRootFileIfFound(item)) {
+                    LogHelper.Info<TemplateHandler>("Removed template file that existed in subfolder and root", () => item.Name);
+                }
+
                 LogHelper.Info<TemplateHandler>("Save: Saving uSync file for item: {0}", () => item.Name);
                 var action = ExportToDisk(item, uSyncBackOfficeContext.Instance.Configuration.Settings.Folder);
 
@@ -147,6 +151,36 @@
                 }
 
             }
+        }
+
+        private Boolean RemoveRootFileIfFound(item) {
+            Boolean removed = false;
+            String foundTemplate = FindTemplate(item.Alias);
+            String GeneratedTemplate = IOHelper.MapPath(string.Format(SystemDirectories.MvcViews + "/{0}.cshtml", item.Alias.ToSafeFileName()));
+            if (!String.IsNullOrEmpty(foundTemplate) && File.ReadAllText(foundTemplate).Equals(item.Content) && File.Exists(GeneratedTemplate) && File.ReadAllText(foundTemplate).Equals(File.ReadAllText(GeneratedTemplate))) {
+                File.Delete(GeneratedTemplate);
+                removed = !removed;
+            }
+            return removed;
+        }
+
+        private String FindTemplate(String alias) {
+            var templatePath = "";
+
+            if (!File.Exists(templatePath)) {
+                var viewsPath = IOHelper.MapPath(SystemDirectories.MvcViews);
+                var directories = Directory.GetDirectories(viewsPath);
+
+                foreach (var directory in directories.Where(x => !x.ToLower().Contains("partials"))) {
+                    var folder = Path.GetFileName(directory);
+                    String relativeFileUrl = string.Format(SystemDirectories.MvcViews + "/{0}/{1}.cshtml", folder, alias.ToSafeFileName());
+                    if (File.Exists(IOHelper.MapPath(relativeFileUrl))) {
+                        templatePath = IOHelper.MapPath(relativeFileUrl);
+                    }
+                }
+            }
+
+            return templatePath;
         }
 
         public override uSyncAction ReportItem(string file)

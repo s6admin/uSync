@@ -11,6 +11,8 @@ namespace Jumoo.uSync.BackOffice
     using System.Linq;
     using Core;
     using System;
+	using Umbraco.Core.Services;
+    using Umbraco.Core.IO;
 
     public class uSyncApplicationEventHandler : ApplicationEventHandler
     {
@@ -54,6 +56,9 @@ namespace Jumoo.uSync.BackOffice
             sw.Start();
 
             LogHelper.Info<uSyncApplicationEventHandler>("Firing up uSync");
+			
+			LogHelper.Info<uSyncApplicationEventHandler>("Setting up template nesting addition");
+            FileService.SavedTemplate += FileService_SavedTemplate;
 
             // just to make the code readable...
             var uSyncBackOffice = uSyncBackOfficeContext.Instance;
@@ -119,8 +124,5 @@ namespace Jumoo.uSync.BackOffice
                 }
             }
         }
-
-
-      
     }
 }
