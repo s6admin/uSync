@@ -79,25 +79,14 @@ namespace Jumoo.uSync.Core.Serializers
 		{
 			var node = new XElement(NODE_NAME);
 
-			node.Add(new XElement("Alias", item.Alias)); // S6 ?
+			node.Add(new XElement("Alias", item.Alias));
 			node.Add(new XElement("ChildObjectType", item.ChildObjectType));			
-			node.Add(new XElement("Bidirectional", item.IsBidirectional));
-			node.Add(new XElement("Key", item.Key)); // S6 ?
-			//node.Add(new XElement("Name", item.Name));
+			node.Add(new XElement("IsBidirectional", item.IsBidirectional));
+			node.Add(new XElement("Id", item.Id)); 
+			node.Add(new XElement("Key", item.Key));
+			node.Add(new XElement("Name", item.Name));
 			node.Add(new XElement("ParentObjectType", item.ParentObjectType));
 			
-			//if (item.RootContentId != null)
-			//{
-			//	var rootNode = ApplicationContext.Current.Services.ContentService.GetById(item.RootContentId.Value);
-			//	if (rootNode != null)
-			//	{
-			//		var rootContentNode = new XElement("RootContent", rootNode.Name);
-			//		rootContentNode.Add(new XAttribute("Key", rootNode.Key));
-			//		node.Add(rootContentNode);
-			//	}
-
-			//}
-
 			return SyncAttempt<XElement>.SucceedIf(
 				node != null, item.Alias, node, typeof(IRelationType), ChangeType.Export);
 
@@ -110,12 +99,12 @@ namespace Jumoo.uSync.Core.Serializers
 				return true;
 
 			//var name = node.Element(NODE_NAME).ValueOrDefault(string.Empty);
-			string relationTypeValue = node.Element("Key").ValueOrDefault(string.Empty);
+			string relationTypeValue = node.Element("Key").ValueOrDefault(string.Empty); // S6 Confirm Key element can be found
 			Guid relationTypeKey = relationTypeValue.IsNullOrWhiteSpace() ? Guid.Empty : new Guid(relationTypeValue); // S6 TODO Handle improper strings
 			if (relationTypeKey.Equals(Guid.Empty))
 				return true;
 
-			var item = relationService.GetRelationTypeById(relationTypeKey); //GetByName(name);
+			var item = relationService.GetRelationTypeById(relationTypeKey);
 			if (item == null)
 				return true;
 

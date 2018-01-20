@@ -105,11 +105,6 @@ namespace Jumoo.uSync.BackOffice.Handlers
 			}
 		}
 
-		public IEnumerable<uSyncAction> ProcessPostImport(string filepath, IEnumerable<uSyncAction> actions)
-		{
-			throw new NotImplementedException();
-		}
-
 		public void RegisterEvents()
 		{
 			RelationService.SavedRelationType += RelationService_SavedRelationType;
@@ -154,5 +149,28 @@ namespace Jumoo.uSync.BackOffice.Handlers
 
 			return action;
 		}
+
+		public IEnumerable<uSyncAction> ProcessPostImport(string folder, IEnumerable<uSyncAction> actions)
+		{
+			if (actions == null || !actions.Any())
+				return null;
+
+			// we get passed actions that need a second pass.
+			var relationTypes = actions.Where(x => x.ItemType == typeof(IRelationType));
+			if (relationTypes == null || !relationTypes.Any())
+				return null;
+
+			foreach (var action in relationTypes)
+			{
+				LogHelper.Debug<RelationTypeHandler>("Post Processing: {0} {1}", () => action.Name, () => action.FileName);
+				var attempt = Import(action.FileName);
+				if (attempt.Success)
+				{
+					ImportSecondPass(action.FileName, attempt.Item);
+				}
+			}
+
+			return actions; //CleanEmptyContainers(folder, -1);
+		}		
 	}
 }

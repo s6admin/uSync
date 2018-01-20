@@ -36,7 +36,7 @@ namespace Jumoo.uSync.Core.Mappers
                 case ContentMappingType.Custom:
                     return ContentMapperFactory.GetCustomMapper(mapping.CustomMappingType);
 				case ContentMappingType.RelationType:
-					return new RelationTypeMapper();
+					return new RelationTypeMapper(); // S6 Not yet implemented exception will throw
                 default:
                     return null;
             }
