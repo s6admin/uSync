@@ -35,6 +35,8 @@ namespace Jumoo.uSync.Core.Mappers
                     return new MediaIdMapper("");
                 case ContentMappingType.Custom:
                     return ContentMapperFactory.GetCustomMapper(mapping.CustomMappingType);
+				case ContentMappingType.RelationType:
+					return new RelationTypeMapper();
                 default:
                     return null;
             }

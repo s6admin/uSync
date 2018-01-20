@@ -179,13 +179,14 @@ namespace Jumoo.uSync.Core
         public string View { get; set; }
     }
 
+	// S6 Add Relation Mapping Type(s)
     public enum ContentMappingType
     {
         Content,
         Media,
         DataType,
         DataTypeKeys,
-        Custom
-
+        Custom,
+		RelationType
     }
 }

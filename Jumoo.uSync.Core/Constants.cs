@@ -14,6 +14,8 @@ namespace Jumoo.uSync.Core
             public const int USYNC_RESERVED_LOWER = 1000;
             public const int USYNC_RESERVED_UPPER = 2000;
 
+			public const int RelationTypes = USYNC_RESERVED_LOWER + 6; // S6
+
             public const int DataTypes = USYNC_RESERVED_LOWER + 10;
             public const int Templates = USYNC_RESERVED_LOWER + 20;
 
@@ -52,6 +54,7 @@ namespace Jumoo.uSync.Core
             public const string Macro = "Macro";
             public const string Template = "Template";
             public const string MemberType = "MemberType";
+			public const string RelationType = "RelationType"; // S6
 
             public const string Domain = "Domain";
 
@@ -73,7 +76,7 @@ namespace Jumoo.uSync.Core
             ///  your responsibility to get them from the system 
             ///  and run them. 
             /// </summary>
-            public const int DefaultPriority = 100;
+            public const int DefaultPriority = 100;					
         }
 
     }
