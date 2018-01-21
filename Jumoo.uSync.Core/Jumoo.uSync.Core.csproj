@@ -332,6 +332,7 @@
     <Compile Include="Serializers\MediaSerializer.cs" />
     <Compile Include="Serializers\MediaTypeSerializer.cs" />
     <Compile Include="Serializers\MemberTypeSerializer.cs" />
+    <Compile Include="Serializers\RelationSerializer.cs" />
     <Compile Include="Serializers\RelationTypeSerializer.cs" />
     <Compile Include="Serializers\SyncBaseSerializer.cs" />
     <Compile Include="Serializers\TemplateSerializer.cs" />

@@ -52,14 +52,20 @@ namespace Jumoo.uSync.Core.Serializers
 				relationType = allRelationTypes.FirstOrDefault(x => x.Alias == relationTypeAlias);
 			}
 
-			// S6 childType and parentType from node data
-			string childTypeValue = node.Element("ChildObjectType").ValueOrDefault(string.Empty);
-			string parentTypeValue = node.Element("ParentObjectType").ValueOrDefault(string.Empty);
-			Guid childType = childTypeValue.IsNullOrWhiteSpace() ? Guid.Empty : new Guid(childTypeValue); // S6 TODO Handle improper strings
-			Guid parentType = parentTypeValue.IsNullOrWhiteSpace() ? Guid.Empty : new Guid(parentTypeValue); // S6 TODO Handle improper strings
+			//// S6 childType and parentType from node data
+			//string childTypeValue = node.Element("ChildObjectType").ValueOrDefault(string.Empty);
+			//string parentTypeValue = node.Element("ParentObjectType").ValueOrDefault(string.Empty);
+			//Guid childType = childTypeValue.IsNullOrWhiteSpace() ? Guid.Empty : new Guid(childTypeValue); // S6 TODO Handle improper strings better 
+			//Guid parentType = parentTypeValue.IsNullOrWhiteSpace() ? Guid.Empty : new Guid(parentTypeValue); // S6 TODO Handle improper strings better
 
 			if (relationType == default(IRelationType))
 			{
+				
+				string childTypeValue = node.Element("ChildObjectType").ValueOrDefault(string.Empty);
+				string parentTypeValue = node.Element("ParentObjectType").ValueOrDefault(string.Empty);
+				Guid childType = childTypeValue.IsNullOrWhiteSpace() ? Guid.Empty : new Guid(childTypeValue); // S6 TODO Handle improper strings better
+				Guid parentType = parentTypeValue.IsNullOrWhiteSpace() ? Guid.Empty : new Guid(parentTypeValue); // S6 TODO Handle improper strings better
+
 				relationType = new RelationType(childType, parentType, relationTypeAlias); //new UmbracoDomain(relationTypeAlias);				
 			}
 
@@ -100,7 +106,7 @@ namespace Jumoo.uSync.Core.Serializers
 
 			//var name = node.Element(NODE_NAME).ValueOrDefault(string.Empty);
 			string relationTypeValue = node.Element("Key").ValueOrDefault(string.Empty); // S6 Confirm Key element can be found
-			Guid relationTypeKey = relationTypeValue.IsNullOrWhiteSpace() ? Guid.Empty : new Guid(relationTypeValue); // S6 TODO Handle improper strings
+			Guid relationTypeKey = relationTypeValue.IsNullOrWhiteSpace() ? Guid.Empty : new Guid(relationTypeValue); // S6 TODO Handle improper strings better
 			if (relationTypeKey.Equals(Guid.Empty))
 				return true;
 
@@ -122,7 +128,7 @@ namespace Jumoo.uSync.Core.Serializers
 		public IEnumerable<uSyncChange> GetChanges(XElement node)
 		{
 			string relationTypeValue = node.Element("Key").ValueOrDefault(string.Empty);
-			Guid relationTypeKey = relationTypeValue.IsNullOrWhiteSpace() ? Guid.Empty : new Guid(relationTypeValue); // S6 TODO Handle improper strings
+			Guid relationTypeKey = relationTypeValue.IsNullOrWhiteSpace() ? Guid.Empty : new Guid(relationTypeValue); // S6 TODO Handle improper strings better
 			if (relationTypeKey.Equals(Guid.Empty))
 				return null;
 

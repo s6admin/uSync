@@ -14,9 +14,10 @@ namespace Jumoo.uSync.Core
             public const int USYNC_RESERVED_LOWER = 1000;
             public const int USYNC_RESERVED_UPPER = 2000;
 
-			public const int RelationTypes = USYNC_RESERVED_LOWER + 6; // S6
+			public const int RelationTypes = USYNC_RESERVED_LOWER + 6; // S6 RelationTypes need to be mapped before Relations
+			public const int Relations = USYNC_RESERVED_LOWER + 8; // S6
 
-            public const int DataTypes = USYNC_RESERVED_LOWER + 10;
+			public const int DataTypes = USYNC_RESERVED_LOWER + 10;
             public const int Templates = USYNC_RESERVED_LOWER + 20;
 
             public const int ContentTypes = USYNC_RESERVED_LOWER + 30;
@@ -55,6 +56,7 @@ namespace Jumoo.uSync.Core
             public const string Template = "Template";
             public const string MemberType = "MemberType";
 			public const string RelationType = "RelationType"; // S6
+			public const string Relation = "Relation"; // S6
 
             public const string Domain = "Domain";
 

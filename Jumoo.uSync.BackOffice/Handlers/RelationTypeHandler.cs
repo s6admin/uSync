@@ -30,7 +30,7 @@ namespace Jumoo.uSync.BackOffice.Handlers
 			_relationService = ApplicationContext.Current.Services.RelationService;
 			_entityService = ApplicationContext.Current.Services.EntityService;
 
-			RequiresPostProcessing = true; // S6?
+			RequiresPostProcessing = true; // S6 Applicable?
 		}
 
 		public override SyncAttempt<IRelationType> Import(string filePath, bool force = false)
@@ -65,6 +65,7 @@ namespace Jumoo.uSync.BackOffice.Handlers
 
 		public IEnumerable<uSyncAction> ExportAll(string folder)
 		{
+			LogHelper.Info<RelationTypeHandler>("Exporting all RelationTypes.");
 			List<uSyncAction> actions = new List<uSyncAction>();
 
 			foreach(var item in _relationService.GetAllRelationTypes())
@@ -79,8 +80,7 @@ namespace Jumoo.uSync.BackOffice.Handlers
 		}
 
 		private uSyncAction ExportToDisk(IRelationType item, string folder)
-		{
-			LogHelper.Info<DataTypeHandler>("Exporting all RelationTypes.");
+		{		
 
 			if(item == null)
 			{
@@ -118,7 +118,7 @@ namespace Jumoo.uSync.BackOffice.Handlers
 
 			foreach (var item in e.DeletedEntities)
 			{
-				LogHelper.Info<MacroHandler>("Delete: Deleting uSync File for item: {0}", () => item.Alias);
+				LogHelper.Info<RelationTypeHandler>("Delete: Deleting uSync File for item: {0}", () => item.Alias);
 				uSyncIOHelper.ArchiveRelativeFile(SyncFolder, item.Alias.ToSafeAlias());
 
 				uSyncBackOfficeContext.Instance.Tracker.AddAction(SyncActionType.Delete, item.Alias, typeof(IRelationType));
@@ -132,7 +132,7 @@ namespace Jumoo.uSync.BackOffice.Handlers
 
 			foreach (var item in e.SavedEntities)
 			{
-				LogHelper.Info<LanguageHandler>("Save: Saving uSync file for item: {0}", () => item.Alias);
+				LogHelper.Info<RelationTypeHandler>("Save: Saving uSync file for item: {0}", () => item.Alias);
 				ExportToDisk(item, uSyncBackOfficeContext.Instance.Configuration.Settings.Folder);
 
 				uSyncBackOfficeContext.Instance.Tracker.RemoveActions(item.Alias, typeof(IRelationType));

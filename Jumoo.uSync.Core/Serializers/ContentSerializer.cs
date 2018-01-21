@@ -182,7 +182,7 @@ namespace Jumoo.uSync.Core.Serializers
                 return attempt;
 
             var node = attempt.Item;
-
+			
             // content specifics..
             node.Add(new XAttribute("parentGUID", item.Level > 1 ? item.Parent().Key : Guid.Empty));
             node.Add(new XAttribute("nodeTypeAlias", item.ContentType.Alias));
