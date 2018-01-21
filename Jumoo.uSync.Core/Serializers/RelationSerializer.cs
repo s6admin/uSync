@@ -16,6 +16,10 @@ namespace Jumoo.uSync.Core.Serializers
 	class RelationSerializer : SyncBaseSerializer<IRelation>, ISyncChangeDetail
 	{
 		private readonly IRelationService relationService;
+		private readonly IContentService contentService;
+		private readonly IContentTypeService contentTypeService;
+		private readonly IDataTypeService dataTypeService;
+		
 		private const string NODE_NAME = "Relation"; 
 
 		public override string SerializerType => uSyncConstants.Serailization.Relation;
@@ -24,6 +28,9 @@ namespace Jumoo.uSync.Core.Serializers
 			:base("Relation")
 		{
 			relationService = ApplicationContext.Current.Services.RelationService;
+			contentService = ApplicationContext.Current.Services.ContentService;
+			contentTypeService = ApplicationContext.Current.Services.ContentTypeService;
+			dataTypeService = ApplicationContext.Current.Services.DataTypeService;			
 		}
 
 		public RelationSerializer(string itemType) : base(itemType) { }
@@ -46,7 +53,7 @@ namespace Jumoo.uSync.Core.Serializers
 			{
 				// It doesn't seem possible to know what TYPE of relation to create in this case because the value would be coming directly from the relation object
 				
-				string relationTypeValue = node.Element("RelationType").ValueOrDefault(string.Empty);
+				string relationTypeValue = node.Element("RelationTypeKey").ValueOrDefault(string.Empty);
 				Guid relationTypeKey = relationTypeValue.IsNullOrWhiteSpace() ? Guid.Empty : new Guid(relationTypeValue);
 				int parentId = -1;
 				int childId = -1;
@@ -74,7 +81,7 @@ namespace Jumoo.uSync.Core.Serializers
 				}				
 			}
 
-			relationName = relation.Key.ToString(); 
+			relationName = relation.Key.ToString().ToSafeAlias(); 
 
 			return SyncAttempt<IRelation>.Succeed(relationName, relation, ChangeType.Import);
 		}
@@ -83,13 +90,51 @@ namespace Jumoo.uSync.Core.Serializers
 		{
 			var node = new XElement(NODE_NAME);
 
+			// S6 TODO NOTE: We're only mapping Guids for DOCUMENTS at the moment, though Relations can exist for many other entities: Members, DocumentTypes, Media, MediaTypes, Recycle Bin, etc...
+			
+			IContent child = contentService.GetById(item.ChildId);
+			IContent parent = contentService.GetById(item.ParentId);
+			string childKeyValue = child != null ? child.Key.ToString() : string.Empty;
+			string parentKeyValue = parent != null ? parent.Key.ToString() : string.Empty;
+			XElement relationMapping = XElement.Parse(item.Comment);
+			int propertyTypeId = -1; 
+			int dataTypeDefinitionId = -1;
+			string propertyTypeKeyValue = string.Empty;
+			string dataTypeDefinitionKeyValue = string.Empty;
+
+			if (relationMapping != null)
+			{
+				propertyTypeId = relationMapping.Attribute("PropertyTypeId").ValueOrDefault(-1);
+
+				//if(propertyTypeId > 0)
+				//{
+				//	contentTypeService.Property
+				//	propertyTypeKeyValue = 
+				//}
+				
+				dataTypeDefinitionId = relationMapping.Attribute("DataTypeDefinitionId").ValueOrDefault(-1);
+
+				if(dataTypeDefinitionId > 0)
+				{
+					IDataTypeDefinition dataTypeDefinition = dataTypeService.GetDataTypeDefinitionById(dataTypeDefinitionId);
+					if(dataTypeDefinition != null)
+					{
+						dataTypeDefinitionKeyValue = dataTypeDefinition.Key.ToString();
+                    }					
+				}
+			}			
+
 			node.Add(new XElement("Id", item.Id)); //relation.Id
 			node.Add(new XElement("ChildId", item.ChildId)); //relation.ChildId
+			node.Add(new XElement("ChildKey", childKeyValue));
 			node.Add(new XElement("ParentId", item.ParentId)); //relation.ParentId
+			node.Add(new XElement("ParentKey", parentKeyValue));
 			node.Add(new XElement("Key", item.Key)); //relation.Key TODO These might always be empty, hence unreliable
 			node.Add(new XElement("RelationTypeKey", item.RelationType.Key)); //relation.RelationType
 			node.Add(new XElement("RelationTypeId", item.RelationTypeId)); //relation.RelationTypeId
-			node.Add(new XElement("Comment", item.Comment)); // S6 TODO Nested Ids may need to be converted to Guids
+			node.Add(new XElement("Comment", item.Comment)); // S6 TODO Should include PropertyTypeId and DataTypeDefinitionId Guids Guids as well 
+			//node.Add(new XElement("PropertyTypeKey", propertyTypeKeyValue));
+			//node.Add(new XElement("DataTypeDefinitionKey", dataTypeDefinitionKeyValue));
 			//node.Add(new XElement("", item)); //relation.UpdateDate
 			//node.Add(new XElement("", item)); //relation.CreateDate
 
