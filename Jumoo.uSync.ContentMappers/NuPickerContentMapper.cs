@@ -33,31 +33,41 @@ namespace Jumoo.uSync.ContentMappers
 		public virtual string GetExportValue(int dataTypeDefinitionId, string value)
 		{
 
-			PreValue relationMappingPreValue = null;
+			IEnumerable<IRelation> relations = null;
+            PreValue relationMappingPreValue = null;
 			string relationAlias = string.Empty;
 			
 			try
 			{
 				// Check NuPicker relation mapping to determine if relations should be updated in uSync data directory				
 				relationMappingPreValue = dataTypeService.GetPreValuesCollectionByDataTypeId(dataTypeDefinitionId).PreValuesAsDictionary["relationMapping"];
-				relationAlias = JObject.Parse(relationMappingPreValue.Value).GetValue("relationTypeAlias").ToString();
+				if(relationMappingPreValue != null && relationMappingPreValue.Value != null)
+				{
+					relationAlias = JObject.Parse(relationMappingPreValue.Value).GetValue("relationTypeAlias").ToString();
+				}				
 			}
 			catch(Exception ex)
 			{
 				LogHelper.Error(typeof(NuPickerContentMapper), ex.Message, ex);
 			}
 
+			if (!relationAlias.IsNullOrWhiteSpace())
+			{
+				relations = GetRelationsForNuPicker(dataTypeDefinitionId, relationAlias);
+			}
+
             if (string.IsNullOrWhiteSpace(value))
 			{				
 				if(value == null)
-				{					
+				{
+					// If there is no relation mapping make sure any associated Relation files are deleted from the uSync data directory					
 					if (relationAlias.IsNullOrWhiteSpace())
 					{
-						// S6 TODO? Delete any existing Relations in the uSync data directory for this property editor (propertyTypeId derived by Key because we are NOT accessing the database in this case)
+						
+					}
 
-						return value;
-					}					
-                }				
+					return value;
+				}				
 			}
 				
 			LogHelper.Debug<NuPickerContentMapper>(">> Export Value: {0}", () => value);
@@ -81,23 +91,13 @@ namespace Jumoo.uSync.ContentMappers
 			{
 				// relationService.GetEntitiesFromRelations
 				// S6 Get all Relations for this property editor and process them through RelationHandler
-
-				IRelationType rt = null; 
-				IEnumerable<IRelation> relations = Enumerable.Empty<IRelation>();
-
-				rt = relationService.GetRelationTypeByAlias(relationAlias);
-				if(rt != null)
+												
+				if(relations != null && relations.Any())
 				{
-					relations = relationService.GetAllRelationsByRelationType(rt.Id)
-					.Where(x => XElement.Parse(x.Comment).Attribute("DataTypeDefinitionId").ValueOrDefault(string.Empty) == dataTypeDefinitionId.ToString());
-
-					if(relations != null && relations.Any())
+					foreach (IRelation r in relations)
 					{
-						foreach (IRelation r in relations)
-						{
-							//relationService.Save(r); // Temporarily disable until we determine if RelationHandler registered Save event fires during nuPicker RelationMappingEvent.Update event
-						}
-					}					
+						//relationService.Save(r); // Temporarily disable until we determine if RelationHandler registered Save event fires during nuPicker RelationMappingEvent.Update event
+					}
 				}				
 			}
 
@@ -134,8 +134,7 @@ namespace Jumoo.uSync.ContentMappers
 
 			return content;
 		}
-
-
+		
 		internal int GetIdFromGuid(Guid guid)
 		{
 			var item = ApplicationContext.Current.Services.EntityService.GetByKey(guid);
@@ -153,5 +152,20 @@ namespace Jumoo.uSync.ContentMappers
 
 			return null;
 		}		
+
+		internal IEnumerable<IRelation> GetRelationsForNuPicker(int dataTypeDefinitionId, string relationAlias)
+		{
+			IRelationType rt = null;
+			IEnumerable<IRelation> relations = Enumerable.Empty<IRelation>();
+
+			rt = relationService.GetRelationTypeByAlias(relationAlias);
+			if (rt != null)
+			{
+				relations = relationService.GetAllRelationsByRelationType(rt.Id)
+				.Where(x => XElement.Parse(x.Comment).Attribute("DataTypeDefinitionId").ValueOrDefault(string.Empty) == dataTypeDefinitionId.ToString());
+			}
+
+			return relations;
+		}
 	}
 }

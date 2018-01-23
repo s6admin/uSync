@@ -25,11 +25,11 @@ namespace Jumoo.uSync.Content
 
 		readonly IRelationService _relationService;
 		readonly IEntityService _entityService;
-
+		
 		public RelationHandler()
 		{
 			_relationService = ApplicationContext.Current.Services.RelationService;
-			_entityService = ApplicationContext.Current.Services.EntityService;			
+			_entityService = ApplicationContext.Current.Services.EntityService;		
 		}
 
 
@@ -95,7 +95,7 @@ namespace Jumoo.uSync.Content
 		public void RegisterEvents()
 		{
 			RelationService.SavedRelation += RelationService_SavedRelation;
-			RelationService.DeletedRelation += RelationService_DeletedRelation;
+			RelationService.DeletedRelation += RelationService_DeletedRelation;			
 		}
 
 		private void RelationService_DeletedRelation(IRelationService sender, Umbraco.Core.Events.DeleteEventArgs<IRelation> e)
