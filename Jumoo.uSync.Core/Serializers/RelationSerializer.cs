@@ -124,20 +124,18 @@ namespace Jumoo.uSync.Core.Serializers
 				return SyncAttempt<IRelation>.Fail(node.NameFromNode(), ChangeType.Import, msg);
 			} else
 			{
-				// Ensure values in Comment node are updated and correct before we
-				relationMapping.Attribute("PropertyTypeKey").SetValue(propertyType.Key);
-				relationMapping.Attribute("PropertyTypeId").SetValue(propertyType.Id); // Target environment Id, NOT the Id from xml
-				relationMapping.Attribute("DataTypeDefinitionKey").SetValue(dataTypeDefinition.Key);
+				// Ensure values in Comment node are updated and correct before we				
+				relationMapping.Attribute("PropertyTypeId").SetValue(propertyType.Id); 				
 				relationMapping.Attribute("DataTypeDefinitionId").SetValue(dataTypeDefinition.Id);                
 			}
 
 			// Look for existing relation record
-			var allRelations = relationService.GetAllRelationsByRelationType(relationType.Id);
 			var relation = default(IRelation);
-			if(allRelations.Any(x => x.Key.Equals(relationKey)))
+			var allRelations = relationService.GetAllRelationsByRelationType(relationType.Id);						
+			if(allRelations != null && allRelations.Any()) 
 			{
-				relation = allRelations.FirstOrDefault(x => x.Key.Equals(relationKey));
-			}
+				relation = allRelations.FirstOrDefault(x => x.ChildId == child.Id && x.ParentId == parent.Id && x.RelationType.Alias == relationType.Alias);
+            }
 			
 			if (relation == default(IRelation))
 			{
@@ -154,7 +152,7 @@ namespace Jumoo.uSync.Core.Serializers
 
 			try
 			{
-				//relationService.Save(relation); // TODO Save record once we've confirmed properties are correct
+				relationService.Save(relation); // TODO Save record once we've confirmed properties are correct
 				saved = true;
 			} catch(Exception ex)
 			{
