@@ -95,7 +95,7 @@ namespace Jumoo.uSync.ContentMappers
 					{
 						foreach (IRelation r in relations)
 						{
-							relationService.Save(r);
+							//relationService.Save(r); // Temporarily disable until we determine if RelationHandler registered Save event fires during nuPicker RelationMappingEvent.Update event
 						}
 					}					
 				}				

@@ -57,22 +57,25 @@ namespace Jumoo.uSync.Content
 			{
 				return uSyncAction.Fail(Path.GetFileName(folder), typeof(IRelation), "item not set");
 			}
+
+			string fileName = GetRelationFilename(item);
+
 			try
 			{
-				var attempt = uSyncCoreContext.Instance.RelationSerializer.Serialize(item);
-				var filename = string.Empty;
+				var attempt = uSyncCoreContext.Instance.RelationSerializer.Serialize(item);				
+				var filePath = string.Empty;
 
 				if (attempt.Success)
-				{
-					filename = uSyncIOHelper.SavePath(folder, SyncFolder, item.Key.ToString().ToSafeAlias()); // S6 TODO confirm ToSafeAlias handles Key sufficiently
-					uSyncIOHelper.SaveNode(attempt.Item, filename);
+				{		
+					filePath = uSyncIOHelper.SavePath(folder, SyncFolder, fileName);
+					uSyncIOHelper.SaveNode(attempt.Item, filePath);
 				}
-				return uSyncActionHelper<XElement>.SetAction(attempt, filename);
+				return uSyncActionHelper<XElement>.SetAction(attempt, filePath);
 
 			}
 			catch (Exception ex)
 			{
-				return uSyncAction.Fail("Relation" + item.Key.ToString().ToSafeAlias(), item.GetType(), ChangeType.Export, ex);
+				return uSyncAction.Fail("Relation" + fileName, item.GetType(), ChangeType.Export, ex);
 			}
 		}
 
@@ -102,7 +105,7 @@ namespace Jumoo.uSync.Content
 
 			foreach (var item in e.DeletedEntities)
 			{
-				string relationName = item.Key.ToString().ToSafeAlias();
+				string relationName = GetRelationFilename(item);
 				LogHelper.Info<RelationHandler>("Delete: Deleting uSync File for item: {0}", () => relationName);
 				uSyncIOHelper.ArchiveRelativeFile(SyncFolder, relationName);
 
@@ -117,7 +120,7 @@ namespace Jumoo.uSync.Content
 
 			foreach (var item in e.SavedEntities)
 			{
-				string relationName = item.Key.ToString().ToSafeAlias();
+				string relationName = GetRelationFilename(item);
 				LogHelper.Info<RelationHandler>("Save: Saving uSync file for item: {0}", () => relationName);
 				ExportToDisk(item, uSyncBackOfficeContext.Instance.Configuration.Settings.Folder);
 
@@ -134,6 +137,18 @@ namespace Jumoo.uSync.Content
 				action.Details = ((ISyncChangeDetail)uSyncCoreContext.Instance.RelationSerializer).GetChanges(node);
 
 			return action;
+		}
+
+		/// <summary>
+		/// Assembles a unique uSync filename for the specified IRelation
+		/// </summary>
+		/// <param name="relation">The relation.</param>
+		/// <returns></returns>
+		private string GetRelationFilename(IRelation relation)
+		{			
+			string fileName = relation.Id + "_" + relation.ParentId + "_" + relation.ChildId + "_" + relation.RelationTypeId;
+			
+			return fileName;
 		}
 	}
 }

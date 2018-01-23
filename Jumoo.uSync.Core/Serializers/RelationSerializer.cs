@@ -41,8 +41,7 @@ namespace Jumoo.uSync.Core.Serializers
 		internal override SyncAttempt<IRelation> DeserializeCore(XElement node)
 		{
 			// Deserialization is stricter than serialization. Only allow import creation and/or update if all needed keys are valid
-			// Ensure we have all necessary keys to create and/or update the Relation
-			string relationName = string.Empty;
+			// Ensure we have all necessary keys to create and/or update the Relation			
 			Guid relationKey = Guid.Empty;
 			Guid childKey = Guid.Empty;
 			Guid parentKey = Guid.Empty;
@@ -169,19 +168,19 @@ namespace Jumoo.uSync.Core.Serializers
 		/// <summary>
 		/// Takes an existing IRelation object and creates a data XML node for exporting.
 		/// </summary>
-		/// <param name="item">The item.</param>
+		/// <param name="relation">The item.</param>
 		/// <returns></returns>
-		internal override SyncAttempt<XElement> SerializeCore(IRelation item)
+		internal override SyncAttempt<XElement> SerializeCore(IRelation relation)
 		{
 			var node = new XElement(NODE_NAME);
 
 			// S6 TODO NOTE: We're only mapping Guids for DOCUMENTS at the moment, though Relations can exist for many other entities: Members, DocumentTypes, Media, MediaTypes, Recycle Bin, etc...
 			
-			IContent child = contentService.GetById(item.ChildId);
-			IContent parent = contentService.GetById(item.ParentId);
+			IContent child = contentService.GetById(relation.ChildId);
+			IContent parent = contentService.GetById(relation.ParentId);
 			string childKeyValue = child != null ? child.Key.ToString() : string.Empty;
 			string parentKeyValue = parent != null ? parent.Key.ToString() : string.Empty;
-			XElement relationMappingComment = XElement.Parse(item.Comment);
+			XElement relationMappingComment = XElement.Parse(relation.Comment);
 			int propertyTypeId = -1; 
 			int dataTypeDefinitionId = -1;
 			string propertyTypeKeyValue = string.Empty;
@@ -211,22 +210,22 @@ namespace Jumoo.uSync.Core.Serializers
 				}
 			}			
 
-			node.Add(new XElement("Id", item.Id));
-			node.Add(new XElement("ChildId", item.ChildId));
+			node.Add(new XElement("Id", relation.Id));
+			node.Add(new XElement("ChildId", relation.ChildId));
 			node.Add(new XElement("ChildKey", childKeyValue));
-			node.Add(new XElement("ParentId", item.ParentId)); 
+			node.Add(new XElement("ParentId", relation.ParentId)); 
 			node.Add(new XElement("ParentKey", parentKeyValue));
-			node.Add(new XElement("Key", item.Key));
-			node.Add(new XElement("RelationTypeKey", item.RelationType.Key));
-			node.Add(new XElement("RelationTypeId", item.RelationTypeId)); 
-			node.Add(new XElement("Comment", item.Comment)); 
+			node.Add(new XElement("Key", relation.Key));
+			node.Add(new XElement("RelationTypeKey", relation.RelationType.Key));
+			node.Add(new XElement("RelationTypeId", relation.RelationTypeId)); 
+			node.Add(new XElement("Comment", relation.Comment)); 
 			node.Add(new XElement("PropertyTypeKey", propertyTypeKeyValue));
 			node.Add(new XElement("DataTypeDefinitionKey", dataTypeDefinitionKeyValue));
 			//node.Add(new XElement("", item)); //relation.UpdateDate
 			//node.Add(new XElement("", item)); //relation.CreateDate
 
 			return SyncAttempt<XElement>.SucceedIf(
-			node != null, item.Key.ToString().ToSafeAlias(), node, typeof(IRelation), ChangeType.Export);
+			node != null, relation.Key.ToString().ToSafeAlias(), node, typeof(IRelation), ChangeType.Export);
 		}
 
 		public override bool IsUpdate(XElement node)
