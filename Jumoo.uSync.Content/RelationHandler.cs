@@ -145,8 +145,8 @@ namespace Jumoo.uSync.Content
 		/// <param name="relation">The relation.</param>
 		/// <returns></returns>
 		private string GetRelationFilename(IRelation relation)
-		{			
-			string fileName = relation.Id + "_" + relation.ParentId + "_" + relation.ChildId + "_" + relation.RelationTypeId;
+		{						
+			string fileName = relation.RelationType.Alias + "_" + relation.ParentId + "_" + relation.ChildId;
 			
 			return fileName;
 		}
