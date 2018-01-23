@@ -1,4 +1,5 @@
 ﻿using Jumoo.uSync.Core.Mappers;
+using Jumoo.uSync.Core.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,6 +8,10 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Umbraco.Core.Logging;
 using Umbraco.Core;
+using Umbraco.Core.Services;
+using Umbraco.Core.Models;
+using System.Xml.Linq;
+using Newtonsoft.Json.Linq;
 
 // S6
 namespace Jumoo.uSync.ContentMappers
@@ -15,16 +20,46 @@ namespace Jumoo.uSync.ContentMappers
 	class NuPickerContentMapper : IContentMapper
 	{
 		private string _exportRegex = string.Empty;
+		private readonly IDataTypeService dataTypeService;
+		private readonly IRelationService relationService;
+
 		public NuPickerContentMapper()
 		{			
 			_exportRegex = @"\d{4,9}";
+			dataTypeService = ApplicationContext.Current.Services.DataTypeService;
+			relationService = ApplicationContext.Current.Services.RelationService;
 		}
 
 		public virtual string GetExportValue(int dataTypeDefinitionId, string value)
 		{
-			if (string.IsNullOrWhiteSpace(value))
-				return value;
 
+			PreValue relationMappingPreValue = null;
+			string relationAlias = string.Empty;
+			
+			try
+			{
+				// Check NuPicker relation mapping to determine if relations should be updated in uSync data directory				
+				relationMappingPreValue = dataTypeService.GetPreValuesCollectionByDataTypeId(dataTypeDefinitionId).PreValuesAsDictionary["relationMapping"];
+				relationAlias = JObject.Parse(relationMappingPreValue.Value).GetValue("relationTypeAlias").ToString();
+			}
+			catch(Exception ex)
+			{
+				LogHelper.Error(typeof(NuPickerContentMapper), ex.Message, ex);
+			}
+
+            if (string.IsNullOrWhiteSpace(value))
+			{				
+				if(value == null)
+				{					
+					if (relationAlias.IsNullOrWhiteSpace())
+					{
+						// S6 TODO? Delete any existing Relations in the uSync data directory for this property editor (propertyTypeId derived by Key because we are NOT accessing the database in this case)
+
+						return value;
+					}					
+                }				
+			}
+				
 			LogHelper.Debug<NuPickerContentMapper>(">> Export Value: {0}", () => value);
 
 			Dictionary<string, string> replacements = new Dictionary<string, string>();
@@ -40,6 +75,30 @@ namespace Jumoo.uSync.ContentMappers
 						replacements.Add(m.Value, itemGuid.ToString().ToLower());
 					}
 				}
+			}
+
+			if (!relationAlias.IsNullOrWhiteSpace())
+			{
+				// relationService.GetEntitiesFromRelations
+				// S6 Get all Relations for this property editor and process them through RelationHandler
+
+				IRelationType rt = null; 
+				IEnumerable<IRelation> relations = Enumerable.Empty<IRelation>();
+
+				rt = relationService.GetRelationTypeByAlias(relationAlias);
+				if(rt != null)
+				{
+					relations = relationService.GetAllRelationsByRelationType(rt.Id)
+					.Where(x => XElement.Parse(x.Comment).Attribute("DataTypeDefinitionId").ValueOrDefault(string.Empty) == dataTypeDefinitionId.ToString());
+
+					if(relations != null && relations.Any())
+					{
+						foreach (IRelation r in relations)
+						{
+							relationService.Save(r);
+						}
+					}					
+				}				
 			}
 
 			foreach (var pair in replacements)
@@ -93,6 +152,6 @@ namespace Jumoo.uSync.ContentMappers
 				return item.Key;
 
 			return null;
-		}
+		}		
 	}
 }

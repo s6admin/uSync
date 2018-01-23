@@ -181,15 +181,15 @@ namespace Jumoo.uSync.Core.Serializers
 			IContent parent = contentService.GetById(item.ParentId);
 			string childKeyValue = child != null ? child.Key.ToString() : string.Empty;
 			string parentKeyValue = parent != null ? parent.Key.ToString() : string.Empty;
-			XElement relationMapping = XElement.Parse(item.Comment);
+			XElement relationMappingComment = XElement.Parse(item.Comment);
 			int propertyTypeId = -1; 
 			int dataTypeDefinitionId = -1;
 			string propertyTypeKeyValue = string.Empty;
 			string dataTypeDefinitionKeyValue = string.Empty;
 
-			if (relationMapping != null)
+			if (relationMappingComment != null)
 			{				
-				propertyTypeId = relationMapping.Attribute("PropertyTypeId").ValueOrDefault(-1);				
+				propertyTypeId = relationMappingComment.Attribute("PropertyTypeId").ValueOrDefault(-1);				
 				if (propertyTypeId > 0)
 				{
 					PropertyType propertyType = child.PropertyTypes.FirstOrDefault(x => x.Id == propertyTypeId);
@@ -199,7 +199,7 @@ namespace Jumoo.uSync.Core.Serializers
 					}
                 }
 
-				dataTypeDefinitionId = relationMapping.Attribute("DataTypeDefinitionId").ValueOrDefault(-1);
+				dataTypeDefinitionId = relationMappingComment.Attribute("DataTypeDefinitionId").ValueOrDefault(-1);
 
 				if(dataTypeDefinitionId > 0)
 				{
