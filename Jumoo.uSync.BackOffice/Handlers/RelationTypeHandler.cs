@@ -28,9 +28,7 @@ namespace Jumoo.uSync.BackOffice.Handlers
 		public RelationTypeHandler()
 		{
 			_relationService = ApplicationContext.Current.Services.RelationService;
-			_entityService = ApplicationContext.Current.Services.EntityService;
-
-			RequiresPostProcessing = true; // S6 Applicable?
+			_entityService = ApplicationContext.Current.Services.EntityService;			
 		}
 
 		public override SyncAttempt<IRelationType> Import(string filePath, bool force = false)
@@ -170,7 +168,7 @@ namespace Jumoo.uSync.BackOffice.Handlers
 				}
 			}
 
-			return actions; //CleanEmptyContainers(folder, -1);
+			return actions;
 		}		
 	}
 }
