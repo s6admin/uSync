@@ -209,8 +209,7 @@ namespace Jumoo.uSync.Core.Serializers
                     }					
 				}
 			}
-			
-			node.Add(new XElement("Id", relation.Id));
+						
 			node.Add(new XElement("ChildId", relation.ChildId));
 			node.Add(new XElement("ChildKey", childKeyValue));
 			node.Add(new XElement("ParentId", relation.ParentId)); 
@@ -351,8 +350,10 @@ namespace Jumoo.uSync.Core.Serializers
 
 		internal string GetRelationNameLabel(XElement node)
 		{
-			string id = node.Element("Id").ValueOrDefault(string.Empty);
-			return "Relation " + id;
+			string label = node.Element("Comment").Attribute("PropertyTypeId").ValueOrDefault(string.Empty) +
+				"Parent: " + node.Element("ParentId").ValueOrDefault(string.Empty) +
+				"Child: " + node.Element("ChildId").ValueOrDefault(string.Empty);
+			return "Relation " + label;
 		}
 
 		internal int GetIdFromGuid(Guid guid)
