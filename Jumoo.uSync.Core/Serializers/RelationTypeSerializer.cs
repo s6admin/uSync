@@ -72,9 +72,9 @@ namespace Jumoo.uSync.Core.Serializers
 			var allRelationTypes = relationService.GetAllRelationTypes();
 
 			var relationType = default(IRelationType);
-			if (allRelationTypes.Any(x => x.Alias == relationTypeAlias))
+			if (allRelationTypes.Any(x => x.Alias == relationTypeAlias)) // S6 TODO What about prioritizing Key to locate a matching type before using Alias?
 			{
-				relationType = allRelationTypes.FirstOrDefault(x => x.Alias == relationTypeAlias);
+				relationType = allRelationTypes.FirstOrDefault(x => x.Alias == relationTypeAlias); // S6 TODO If we find a matching type should we force update the Key? If so we may need to hook the RelationType Saving(ed?) method because any Relations of the same type need to be updated...but their db value is the relType INT so we might dodge a bullet here?
 			}
 
 			if (relationType == default(IRelationType))
@@ -113,9 +113,9 @@ namespace Jumoo.uSync.Core.Serializers
 			node.Add(new XElement("Alias", item.Alias));
 			node.Add(new XElement("ChildObjectType", item.ChildObjectType));			
 			node.Add(new XElement("IsBidirectional", item.IsBidirectional));
-			//node.Add(new XElement("Id", item.Key)); // NOTE Id is the primary key of a RelationType and cannot be modified/updated. The Key is used instead because without an <Id> node uSync automatically flags the item as a DELETE action
+			//node.Add(new XElement("Id", item.Key)); // NOTE Id is the primary database key of a RelationType and cannot be modified/updated by. The Key is used instead because without an <Id> node uSync automatically flags the item as a DELETE action
 			node.Add(new XElement("Key", item.Key));
-			node.Add(new XElement("Name", item.Name));
+			node.Add(new XElement("Name", item.Name));			
 			node.Add(new XElement("ParentObjectType", item.ParentObjectType));
 			
 			return SyncAttempt<XElement>.SucceedIf(
@@ -125,7 +125,7 @@ namespace Jumoo.uSync.Core.Serializers
 
 		public override bool IsUpdate(XElement node)
 		{
-			// S6 NOTE The RelationType Id is never remapped so no <Id> tag will be present in either XElement
+			// S6 NOTE The RelationType Id value should not be changed/updated so the <Id> tag is excluded from both XElement objects so the hash can be compared properly
 
 			var nodeHash = node.GetSyncHash();
 			if (string.IsNullOrEmpty(nodeHash))
@@ -142,7 +142,7 @@ namespace Jumoo.uSync.Core.Serializers
 				return true;
 			} else
 			{
-				// TODO If an existing RelationType is found and we don't want Id to be overwritten we need to exclude the <Id> tag from the hash check otherwise it will always return true (mismatch)
+				
 			}
 
 			var attempt = Serialize(item);
@@ -159,26 +159,43 @@ namespace Jumoo.uSync.Core.Serializers
 
 		public IEnumerable<uSyncChange> GetChanges(XElement node)
 		{
-			
-			Guid relationTypeKey = Guid.Empty;
-			Guid.TryParse(node.Element("Key").ValueOrDefault(string.Empty), out relationTypeKey);
-			if (relationTypeKey.Equals(Guid.Empty))
+			var nodeHash = node.GetSyncHash();
+			if (string.IsNullOrEmpty(nodeHash))
 				return null;
+
+			Guid relationTypeKey = node.Element("Key").KeyOrDefault();			
+			if (relationTypeKey.Equals(Guid.Empty))
+			{
+				return null; //return uSyncChangeTracker.ChangeError(node.NameFromNode());
+			}				
 
 			var item = relationService.GetRelationTypeById(relationTypeKey);
 			if (item == null)
-				return null;
-
+			{
+				// If no matching Key was found also check for entity by Alias before deciding if Item is new
+				string aliasValue = node.Element("Alias").ValueOrDefault(string.Empty);
+				if(aliasValue.IsNullOrWhiteSpace())
+				{
+					return null; //return uSyncChangeTracker.ChangeError(node.NameFromNode());					
+				} else
+				{
+					item = relationService.GetRelationTypeByAlias(aliasValue);
+					if (item == null)
+					{
+						return uSyncChangeTracker.NewItem(node.NameFromNode());
+					} 
+				}							
+			}
+				
 			var attempt = Serialize(item);
 			if (attempt.Success)
 			{
 				return uSyncChangeTracker.GetChanges(node, attempt.Item, "");
 			}
 			else
-			{
-				var name = node.Element(NODE_NAME).ValueOrDefault(NODE_NAME);
-				return uSyncChangeTracker.ChangeError(name);
-			}
+			{				
+				return uSyncChangeTracker.ChangeError(node.NameFromNode());
+			}			
 		}
 	}
 }

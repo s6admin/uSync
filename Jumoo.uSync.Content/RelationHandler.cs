@@ -14,6 +14,7 @@ using System.IO;
 using Jumoo.uSync.BackOffice.Helpers;
 using System.Xml.Linq;
 using Jumoo.uSync.Core.Extensions;
+using Jumoo.uSync.Core.Helpers;
 
 namespace Jumoo.uSync.Content
 {
@@ -131,8 +132,30 @@ namespace Jumoo.uSync.Content
 		public override uSyncAction ReportItem(string file)
 		{
 			var node = XElement.Load(file);
-			var update = uSyncCoreContext.Instance.RelationSerializer.IsUpdate(node);
-			var action = uSyncActionHelper<IRelation>.ReportAction(update, node.NameFromNode());
+			string itemName = GetRelationFilename(node);
+			// TODO Checking for the RelationType during the Relation ReportItem might be premature...particularly if the RelationType is going to be created as a part of the same import
+			bool update = false;
+			try
+			{
+				update = uSyncCoreContext.Instance.RelationSerializer.IsUpdate(node);
+			} catch (Exception ex) {
+				LogHelper.Warn(typeof(RelationHandler), ex.Message);
+				//return uSyncChangeTracker.ChangeError(GetRelationFilename(node));
+				
+                var skipAction = uSyncActionHelper<IRelation>.ReportAction(false, itemName);
+				skipAction.Change = ChangeType.Fail;
+				uSyncChange change = new uSyncChange();
+				change.Name = "RelationTypeKey";
+				change.Path = file;
+				change.ValueType = ChangeValueType.Value;
+				change.OldVal = "No Relation Type with specifed key was not found.";
+				change.NewVal = node.Element("RelationTypeKey").KeyOrDefault().ToString();			
+				skipAction.Details = change.AsEnumerableOfOne();				
+				skipAction.Success = false;
+				skipAction.Exception = ex;
+				return skipAction;
+			}			
+			var action = uSyncActionHelper<IRelation>.ReportAction(update, itemName);
 			if (action.Change > ChangeType.NoChange)
 				action.Details = ((ISyncChangeDetail)uSyncCoreContext.Instance.RelationSerializer).GetChanges(node);
 
@@ -149,6 +172,15 @@ namespace Jumoo.uSync.Content
 			string fileName = relation.RelationType.Alias + "_" + relation.ParentId + "_" + relation.ChildId;
 			
 			return fileName;
+		}
+
+		private string GetRelationFilename(XElement node)
+		{
+			string fileName = node.Element("Comment").Attribute("PropertyTypeId").ValueOrDefault(string.Empty) +
+				"Parent: " + node.Element("ParentId").ValueOrDefault(string.Empty) +
+				" Child: " + node.Element("ChildId").ValueOrDefault(string.Empty);
+
+			return "Relation " + fileName;						
 		}
 	}
 }

@@ -140,6 +140,8 @@ namespace Jumoo.uSync.Core.Serializers
             if (string.IsNullOrEmpty(nodeHash))
                 return true;
 
+			// S6 TODO Use Key over Alias if Umbraco is 7.? (whenever keys started becoming constant)
+			
             var aliasNode = node.Element("Alias");
             if (aliasNode == null)
                 return true;
@@ -167,28 +169,47 @@ namespace Jumoo.uSync.Core.Serializers
             if (string.IsNullOrEmpty(nodeHash))
                 return null;
 
-            var key = node.Element("Key");
-            if (key == null)
-                return null;
+			/* 
+				S6 
+				If uSync IsUpdate() uses Alias shouldn't it also do so here? 
+				Otherwise two Templates with the same Alias but different Keys (if they 
+				were created in different environments) would always be flagged with
+				uSyncChangeTracker.NewItem because the Key lookup would return NULL.
+				If the User imports wouldnt'  uSync attempt to create a new Template with a colliding Alias?
+			*/
 
-            Guid templateGuid = Guid.Empty;
-            if (!Guid.TryParse(key.Value, out templateGuid))
-                return null;
+			//var key = node.Element("Key");
+			//if (key == null)
+			//    return null;
 
-            var item = _fileService.GetTemplate(templateGuid);
-            if (item == null)
-            {
-                return uSyncChangeTracker.NewItem( node.NameFromNode());
-            }
+			//Guid templateGuid = Guid.Empty;
+			//if (!Guid.TryParse(key.Value, out templateGuid))
+			//    return null;
 
-            var attempt = Serialize(item);
+			//var item = _fileService.GetTemplate(templateGuid);
+			//if (item == null)
+			//{
+			//    return uSyncChangeTracker.NewItem(node.NameFromNode());
+			//}
+
+			var aliasNode = node.Element("Alias");
+			if (aliasNode == null)
+				return null;
+
+			var item = _fileService.GetTemplate(aliasNode.Value);
+			if (item == null)
+			{
+				return uSyncChangeTracker.NewItem(node.NameFromNode());
+			}
+
+			var attempt = Serialize(item);
             if (attempt.Success)
             {
                 return uSyncChangeTracker.GetChanges(node, attempt.Item, "");
             }
             else
             {
-                return uSyncChangeTracker.ChangeError(key.Value);
+                return uSyncChangeTracker.ChangeError(aliasNode.Value);
             }
         }
         #endregion

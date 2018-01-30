@@ -43,50 +43,50 @@ namespace Jumoo.uSync.Core.Serializers
 				records during a deserializing/import.			 
 			 */
 			string relationName = GetRelationNameLabel(node);			
-			Guid childKey = Guid.Empty;
-			Guid parentKey = Guid.Empty;
-			Guid relationTypeKey = Guid.Empty;
-			Guid propertyTypeKey = Guid.Empty;
-			Guid dataTypeDefinitionKey = Guid.Empty;
+			Guid childKey = node.Element("ChildKey").KeyOrDefault();
+			Guid parentKey = node.Element("ParentKey").KeyOrDefault();
+			Guid relationTypeKey = node.Element("RelationTypeKey").KeyOrDefault();
+			Guid propertyTypeKey = node.Element("PropertyTypeKey").KeyOrDefault();
+			Guid dataTypeDefinitionKey = node.Element("DataTypeDefinitionKey").KeyOrDefault();
 						
-			if (!Guid.TryParse(node.Element("ChildKey").ValueOrDefault(string.Empty), out childKey)) {
+			if (childKey.Equals(Guid.Empty)) {
 				string msg = "Could not find ChildKey to deserialize for " + relationName;
 				LogHelper.Warn(typeof(RelationSerializer), msg);
-				return SyncAttempt<IRelation>.Fail(node.NameFromNode(), ChangeType.Import, msg);
+				return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
 			}
-			if(!Guid.TryParse(node.Element("ParentKey").ValueOrDefault(string.Empty), out parentKey))
+			if(parentKey.Equals(Guid.Empty))
 			{
 				string msg = "Could not find ParentKey to deserialize for " + relationName;
 				LogHelper.Warn(typeof(RelationSerializer), msg);
-				return SyncAttempt<IRelation>.Fail(node.NameFromNode(), ChangeType.Import, msg);
+				return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
 			}			
-			if (!Guid.TryParse(node.Element("RelationTypeKey").ValueOrDefault(string.Empty), out relationTypeKey))
+			if (relationTypeKey.Equals(Guid.Empty))
 			{
 				string msg = "Could not find RelationTypeKey to deserialize for " + relationName;
 				LogHelper.Warn(typeof(RelationSerializer), msg);
-				return SyncAttempt<IRelation>.Fail(node.NameFromNode(), ChangeType.Import, msg);
+				return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
 			}
-			if (!Guid.TryParse(node.Element("PropertyTypeKey").ValueOrDefault(string.Empty), out propertyTypeKey))
+			if (propertyTypeKey.Equals(Guid.Empty))
 			{
 				string msg = "Could not find PropertyTypeKey to deserialize for " + relationName;
 				LogHelper.Warn(typeof(RelationSerializer), msg);
-				return SyncAttempt<IRelation>.Fail(node.NameFromNode(), ChangeType.Import, msg);
+				return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
 			}
-			if (!Guid.TryParse(node.Element("DataTypeDefinitionKey").ValueOrDefault(string.Empty), out dataTypeDefinitionKey))
+			if (dataTypeDefinitionKey.Equals(Guid.Empty))
 			{
 				string msg = "Could not find DataTypeDefinitionKey to deserialize for " + relationName;
 				LogHelper.Warn(typeof(RelationSerializer), msg);
-				return SyncAttempt<IRelation>.Fail(node.NameFromNode(), ChangeType.Import, msg);
+				return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
 			}
 
 			// If all keys are valid, begin retrieving content in target environment
 
-			IContent child = contentService.GetById(childKey); // Retrieve child so we can 
+			IContent child = contentService.GetById(childKey); 
 			if(child == null)
 			{
 				string msg = "Could not find child content " + childKey.ToString() + " for " + relationName;
 				LogHelper.Warn(typeof(RelationSerializer), msg);
-				return SyncAttempt<IRelation>.Fail(node.NameFromNode(), ChangeType.Import, msg);
+				return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
 			}
 						
 			int parentId = GetIdFromGuid(parentKey);
@@ -94,7 +94,7 @@ namespace Jumoo.uSync.Core.Serializers
 			{
 				string msg = "Could not find parent content " + parentKey.ToString() + " for " + relationName;
 				LogHelper.Warn(typeof(RelationSerializer), msg);
-				return SyncAttempt<IRelation>.Fail(node.NameFromNode(), ChangeType.Import, msg);
+				return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
 			}
 
 			IRelationType relationType = relationService.GetRelationTypeById(relationTypeKey);			
@@ -102,7 +102,7 @@ namespace Jumoo.uSync.Core.Serializers
 			{
 				string msg = "Could not find relation type " + relationTypeKey.ToString() + " for " + relationName;
 				LogHelper.Warn(typeof(RelationSerializer), msg);
-				return SyncAttempt<IRelation>.Fail(node.NameFromNode(), ChangeType.Import, msg);
+				return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
 			}
 
 			PropertyType propertyType = child.PropertyTypes.FirstOrDefault(x => x.Key == propertyTypeKey);
@@ -115,7 +115,7 @@ namespace Jumoo.uSync.Core.Serializers
 				// S6 TODO Should this completely fail or can we attempt to reassemble the RelationMapping tag since we know its structure?
 				string msg = "Could not deserialize relation mapping xml node for " + relationName;
 				LogHelper.Warn(typeof(RelationSerializer), msg);
-				return SyncAttempt<IRelation>.Fail(node.NameFromNode(), ChangeType.Import, msg);
+				return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
 			} else
 			{
 				// Ensure values in Comment node are updated and correct before we				
@@ -228,8 +228,17 @@ namespace Jumoo.uSync.Core.Serializers
 			var nodeHash = node.GetSyncHash();
 			if (string.IsNullOrEmpty(nodeHash))
 				return true;
-						
-			var item = GetRelation(node);
+
+			IRelation item = null;
+			try
+			{
+				item = GetRelation(node);
+			}
+			catch (Exception ex)
+			{
+				// GetRelation may throw an Exception if the specified RelationType isn't found, but we aren't concerned about this during IsUpdate calls
+			}
+			
 			if (item == null)
 				return true;
 
@@ -246,18 +255,25 @@ namespace Jumoo.uSync.Core.Serializers
 		{
 			var nodeHash = node.GetSyncHash();
 			if (string.IsNullOrEmpty(nodeHash))
-				return null;
+			{
+				return null; //return uSyncChangeTracker.ChangeError(GetRelationNameLabel(node));
+			}
 
-			//int relationId = -1;			
-			//if (!int.TryParse(node.Element("Id").ValueOrDefault(string.Empty), out relationId))			
-			//{				
-			//	return null;
-			//}
-
-			//var item = relationService.GetById(relationId);
-			var item = GetRelation(node);
+			IRelation item = null;
+			try {
+				item = GetRelation(node);
+			} catch(Exception ex) {
+				LogHelper.Warn(typeof(RelationSerializer), ex.Message + " Item will be skipped.");
+                //return uSyncChangeTracker.ChangeError(GetRelationNameLabel(node));
+			}
 			if (item == null)
-				return null;
+			{
+				return null; //return uSyncChangeTracker.ChangeError(GetRelationNameLabel(item));
+			}
+			else if (item == default(IRelation))
+			{
+				return uSyncChangeTracker.NewItem(GetRelationNameLabel(item));
+			}				
 
 			var attempt = Serialize(item);
 			if (attempt.Success)
@@ -280,8 +296,17 @@ namespace Jumoo.uSync.Core.Serializers
 			var nodeHash = node.GetSyncHash();
 			if (string.IsNullOrEmpty(nodeHash))
 				return true;
-						
-			var item = GetRelation(node);
+
+			IRelation item = null;
+			try
+			{
+				item = GetRelation(node);
+			}
+			catch (Exception ex)
+			{
+				//LogHelper.Warn(typeof(RelationSerializer), ex.Message);
+				// GetRelation may throw an Exception if the specified RelationType isn't found, but we aren't concerned about this during IsDifferent calls
+			}
 			if (item == null)
 				return true;
 
@@ -296,63 +321,64 @@ namespace Jumoo.uSync.Core.Serializers
 
 		private IRelation GetRelation(XElement node)
 		{
-			Guid relationTypeKey = Guid.Empty;
-			IRelation relation = null;
+						
+			Guid childKey = node.Element("ChildKey").KeyOrDefault();
+			Guid parentKey = node.Element("ParentKey").KeyOrDefault();
+			Guid relationTypeKey = node.Element("RelationTypeKey").KeyOrDefault();
+			IRelation relation = default(IRelation);
 			IRelationType relationType = null;
-			Guid childKey = Guid.Empty;
-			Guid parentKey = Guid.Empty;
-			
-			if (!Guid.TryParse(node.Element("ChildKey").ValueOrDefault(string.Empty), out childKey))						
+
+			if (childKey.Equals(Guid.Empty))						
 			{
 				string msg = "Could not find ChildKey to deserialize for Relation ";
 				LogHelper.Warn(typeof(RelationSerializer), msg);
 				return null;
 			}
-			if (!Guid.TryParse(node.Element("ParentKey").ValueOrDefault(string.Empty), out parentKey))
+			if (parentKey.Equals(Guid.Empty))
 			{
 				string msg = "Could not find ParentKey to deserialize for Relation ";
 				LogHelper.Warn(typeof(RelationSerializer), msg);
 				return null;
 			}
-			if (!Guid.TryParse(node.Element("RelationTypeKey").ValueOrDefault(string.Empty), out relationTypeKey))
+			if (relationTypeKey.Equals(Guid.Empty))
 			{
 				string msg = "Could not find RelationTypeKey to deserialize for Relation ";
 				LogHelper.Warn(typeof(RelationSerializer), msg);
 				return null;			
 			}
-						
-			if (!childKey.Equals(Guid.Empty) && !parentKey.Equals(Guid.Empty) && !relationTypeKey.Equals(Guid.Empty)) 
+				
+			relationType = relationService.GetRelationTypeById(relationTypeKey);
+
+			if(relationType == null)
 			{
-				relationType = relationService.GetRelationTypeById(relationTypeKey);
-
-				if(relationType != null)
-				{
-					IEnumerable<IRelation> relationResults = relationService.GetByRelationTypeId(relationType.Id);
-					if(relationResults == null || !relationResults.Any())
-					{
-						return null;
-					}
-
-					int parentId = GetIdFromGuid(parentKey);
-					int childId = GetIdFromGuid(childKey);
-
-					relation = relationResults.FirstOrDefault(x => x.ParentId == parentId && x.ChildId == childId);
-				}				
+				// If the Relation's RelationType isn't found it should be skipped entirely
+				throw new Exception("Could not determine RelationType for " + GetRelationNameLabel(node) + ".");
 			}
+
+			IEnumerable<IRelation> relationResults = relationService.GetByRelationTypeId(relationType.Id);
+			if (relationResults == null || !relationResults.Any())
+			{
+				return null;
+			}
+
+			int parentId = GetIdFromGuid(parentKey);
+			int childId = GetIdFromGuid(childKey);
+
+			relation = relationResults.FirstOrDefault(x => x.ParentId == parentId && x.ChildId == childId);
 
 			return relation;
 		}
 
-		internal string GetRelationNameLabel(IRelation relation)
+		public string GetRelationNameLabel(IRelation relation)
 		{
 			return "Relation " + relation.Id;
 		}
 
-		internal string GetRelationNameLabel(XElement node)
+		public string GetRelationNameLabel(XElement node)
 		{
 			string label = node.Element("Comment").Attribute("PropertyTypeId").ValueOrDefault(string.Empty) +
 				"Parent: " + node.Element("ParentId").ValueOrDefault(string.Empty) +
-				"Child: " + node.Element("ChildId").ValueOrDefault(string.Empty);
+				" Child: " + node.Element("ChildId").ValueOrDefault(string.Empty);
 			return "Relation " + label;
 		}
 
