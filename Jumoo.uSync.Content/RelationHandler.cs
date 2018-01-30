@@ -132,29 +132,8 @@ namespace Jumoo.uSync.Content
 		public override uSyncAction ReportItem(string file)
 		{
 			var node = XElement.Load(file);
-			string itemName = GetRelationFilename(node);
-			// TODO Checking for the RelationType during the Relation ReportItem might be premature...particularly if the RelationType is going to be created as a part of the same import
-			bool update = false;
-			try
-			{
-				update = uSyncCoreContext.Instance.RelationSerializer.IsUpdate(node);
-			} catch (Exception ex) {
-				LogHelper.Warn(typeof(RelationHandler), ex.Message);
-				//return uSyncChangeTracker.ChangeError(GetRelationFilename(node));
-				
-                var skipAction = uSyncActionHelper<IRelation>.ReportAction(false, itemName);
-				skipAction.Change = ChangeType.Fail;
-				uSyncChange change = new uSyncChange();
-				change.Name = "RelationTypeKey";
-				change.Path = file;
-				change.ValueType = ChangeValueType.Value;
-				change.OldVal = "No Relation Type with specifed key was not found.";
-				change.NewVal = node.Element("RelationTypeKey").KeyOrDefault().ToString();			
-				skipAction.Details = change.AsEnumerableOfOne();				
-				skipAction.Success = false;
-				skipAction.Exception = ex;
-				return skipAction;
-			}			
+			string itemName = GetRelationFilename(node);			
+			bool update = uSyncCoreContext.Instance.RelationSerializer.IsUpdate(node);
 			var action = uSyncActionHelper<IRelation>.ReportAction(update, itemName);
 			if (action.Change > ChangeType.NoChange)
 				action.Details = ((ISyncChangeDetail)uSyncCoreContext.Instance.RelationSerializer).GetChanges(node);

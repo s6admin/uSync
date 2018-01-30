@@ -303,8 +303,7 @@ namespace Jumoo.uSync.Core.Serializers
 				item = GetRelation(node);
 			}
 			catch (Exception ex)
-			{
-				//LogHelper.Warn(typeof(RelationSerializer), ex.Message);
+			{				
 				// GetRelation may throw an Exception if the specified RelationType isn't found, but we aren't concerned about this during IsDifferent calls
 			}
 			if (item == null)
@@ -352,7 +351,9 @@ namespace Jumoo.uSync.Core.Serializers
 			if(relationType == null)
 			{
 				// If the Relation's RelationType isn't found it should be skipped entirely
-				throw new Exception("Could not determine RelationType for " + GetRelationNameLabel(node) + ".");
+				Exception ex = new Exception("Could not determine RelationType for " + GetRelationNameLabel(node) + ".");
+				LogHelper.Warn(typeof(RelationSerializer), ex.Message);
+				throw ex;
 			}
 
 			IEnumerable<IRelation> relationResults = relationService.GetByRelationTypeId(relationType.Id);
