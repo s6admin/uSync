@@ -15,8 +15,8 @@ using System.Globalization;
 
 namespace Jumoo.uSync.Core.Serializers
 {
-    public class ContentSerializer : ContentBaseSerializer<IContent>
-    {
+    public class ContentSerializer : ContentBaseSerializer<IContent>, ISyncChangeDetail
+	{
         private bool _blueprintEnabled; 
 
         public override string SerializerType
@@ -350,5 +350,31 @@ namespace Jumoo.uSync.Core.Serializers
             // this isn't the quickest thing - but hopefully once the first sync is done, we don't get here that often.
             return nodes.FirstOrDefault(x => x.Name == name && x.ContentType.Alias == contentTypeAlias);
         }
-    }
+
+		public IEnumerable<uSyncChange> GetChanges(XElement node)
+		{
+		
+			var key = node.Attribute("guid").ValueOrDefault(Guid.Empty);
+			if (key == Guid.Empty)
+				return null;
+
+			var nodeHash = node.GetSyncHash();
+			if (string.IsNullOrEmpty(nodeHash))
+				return null;
+
+			var item = _contentService.GetById(key);
+			if (item == null)
+				return null;
+
+			var attempt = Serialize(item);
+			if (attempt.Success)
+			{
+				return uSyncChangeTracker.GetChanges(node, attempt.Item, "");
+			}
+			else
+			{
+				return uSyncChangeTracker.ChangeError(node.NameFromNode());
+			}
+		}
+	}
 }

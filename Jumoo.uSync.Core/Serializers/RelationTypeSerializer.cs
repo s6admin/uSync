@@ -37,29 +37,26 @@ namespace Jumoo.uSync.Core.Serializers
 		{
 			var relationTypeAlias = node.Element("Alias").ValueOrDefault(""); 
 			if (string.IsNullOrEmpty(relationTypeAlias))
-				return SyncAttempt<IRelationType>.Fail(node.NameFromNode(), ChangeType.Import, "Missing RelationType");
-			
-			Guid relationTypeKey = Guid.Empty;
-			Guid childTypeKey = Guid.Empty;
-			Guid parentTypeKey = Guid.Empty;
+				return SyncAttempt<IRelationType>.Fail(node.NameFromNode(), ChangeType.Import, "Missing RelationType Alias");
 
-			Guid.TryParse(node.Element("Key").ValueOrDefault(string.Empty), out relationTypeKey);
+			Guid relationTypeKey = node.Element("Key").KeyOrDefault();
+			Guid childTypeKey = node.Element("ChildObjectType").KeyOrDefault();
+			Guid parentTypeKey = node.Element("ParentObjectType").KeyOrDefault();
+			
 			if (relationTypeKey.Equals(Guid.Empty))
 			{
 				string msg = "Could not deserialize RelationTypeKey for RelationType " + relationTypeAlias;
 				LogHelper.Warn(typeof(RelationTypeSerializer), msg);
 				return SyncAttempt<IRelationType>.Fail(node.NameFromNode(), ChangeType.Import, msg);
 			}
-
-			Guid.TryParse(node.Element("ChildObjectType").ValueOrDefault(string.Empty), out childTypeKey);
+						
 			if (childTypeKey.Equals(Guid.Empty))
 			{
 				string msg = "Could not deserialize ChildObjectType for RelationType " + relationTypeAlias;
 				LogHelper.Warn(typeof(RelationTypeSerializer), msg);
 				return SyncAttempt<IRelationType>.Fail(node.NameFromNode(), ChangeType.Import, msg);
 			}
-
-			Guid.TryParse(node.Element("ParentObjectType").ValueOrDefault(string.Empty), out parentTypeKey);
+						
 			if (parentTypeKey.Equals(Guid.Empty))
 			{
 				string msg = "Could not deserialize ParentObjectType for RelationType " + relationTypeAlias;
@@ -74,15 +71,15 @@ namespace Jumoo.uSync.Core.Serializers
 			var relationType = default(IRelationType);
 			if (allRelationTypes.Any(x => x.Alias == relationTypeAlias)) // S6 TODO What about prioritizing Key to locate a matching type before using Alias?
 			{
-				relationType = allRelationTypes.FirstOrDefault(x => x.Alias == relationTypeAlias); // S6 TODO If we find a matching type should we force update the Key? If so we may need to hook the RelationType Saving(ed?) method because any Relations of the same type need to be updated...but their db value is the relType INT so we might dodge a bullet here?
+				relationType = allRelationTypes.FirstOrDefault(x => x.Alias == relationTypeAlias); 
 			}
 
 			if (relationType == default(IRelationType))
 			{				
-				relationType = new RelationType(childTypeKey, parentTypeKey, relationTypeAlias);
-				relationType.Key = relationTypeKey;
+				relationType = new RelationType(childTypeKey, parentTypeKey, relationTypeAlias);				
             }
-						
+
+			relationType.Key = relationTypeKey;
 			relationType.Name = node.Element("Name").ValueOrDefault(relationTypeAlias);
 			relationType.IsBidirectional = node.Element("IsBidirectional").ValueOrDefault(true);
 
@@ -131,8 +128,7 @@ namespace Jumoo.uSync.Core.Serializers
 			if (string.IsNullOrEmpty(nodeHash))
 				return true;
 			
-			Guid relationTypeKey = Guid.Empty;
-			Guid.TryParse(node.Element("Key").ValueOrDefault(string.Empty), out relationTypeKey);
+			Guid relationTypeKey = node.Element("Key").KeyOrDefault();			
 			if (relationTypeKey.Equals(Guid.Empty))
 				return true;
 

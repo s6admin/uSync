@@ -204,7 +204,11 @@ namespace Jumoo.uSync.Content
         {
             var node = XElement.Load(file);
             var update = uSyncCoreContext.Instance.ContentSerializer.IsUpdate(node);
-            return uSyncActionHelper<IContent>.ReportAction(update, node.NameFromNode());
+			// S6 Implemented GetChanges so Details are provided about Content node differences. Was this intentionally omitted?
+			var action = uSyncActionHelper<IContent>.ReportAction(update, node.NameFromNode());
+			if (action.Change > ChangeType.NoChange)
+				action.Details = ((ISyncChangeDetail)uSyncCoreContext.Instance.ContentSerializer).GetChanges(node);
+			return action;
         }
     }
 }

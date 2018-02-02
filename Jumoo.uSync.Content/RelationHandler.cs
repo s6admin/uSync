@@ -132,8 +132,8 @@ namespace Jumoo.uSync.Content
 		public override uSyncAction ReportItem(string file)
 		{
 			var node = XElement.Load(file);
-			string itemName = GetRelationFilename(node);			
-			bool update = uSyncCoreContext.Instance.RelationSerializer.IsUpdate(node);
+			string itemName = GetRelationFilename(node);
+			bool update = update = uSyncCoreContext.Instance.RelationSerializer.IsUpdate(node);			
 			var action = uSyncActionHelper<IRelation>.ReportAction(update, itemName);
 			if (action.Change > ChangeType.NoChange)
 				action.Details = ((ISyncChangeDetail)uSyncCoreContext.Instance.RelationSerializer).GetChanges(node);
