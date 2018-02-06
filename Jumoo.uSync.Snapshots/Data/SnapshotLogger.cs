@@ -43,7 +43,7 @@ namespace Jumoo.uSync.Snapshots.Data
                 {
                     Name = Path.GetFileName(info.Folder),
                     IsLocal = local,
-                    Applied = MinDateTime
+                    Applied = local ? DateTime.Now : MinDateTime // S6 Aren't all local logs naturally "applied" once they've been created?
                 };
 
                 db.Insert(log);

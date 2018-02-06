@@ -39,12 +39,41 @@ namespace Jumoo.uSync.Content
 			LogHelper.Info<RelationHandler>("Exporting all Relations.");
 
 			List<uSyncAction> actions = new List<uSyncAction>();
+			IEnumerable<IRelation> allRelations = _relationService.GetAllRelations();
+			IEnumerable<IRelation> keylessRelations = allRelations.Where(x => x.Comment.Length == 0 || 
+			(XElement.Parse(x.Comment).Attribute("RelationKey").ValueOrDefault(Guid.Empty)).Equals(Guid.Empty));
 
-			foreach (var item in _relationService.GetAllRelations())
+			// Ensure all Relations have a custom Key before they are exported
+			uSyncEvents.Paused = true;
+			foreach(IRelation item in keylessRelations)
+			{
+				if (!CreateRelationKey(item).Equals(Guid.Empty))
+				{
+					_relationService.Save(item); // This will naturally Export each item after it is saved, which is why uSyncEvents are temporarily paused during this loop
+				} else
+				{
+					// Could not create a key on this Relation (ie. bad Comment data)
+					actions.Add(uSyncAction.Fail("Relation " + GetRelationFilename(item), typeof(IRelation), ChangeType.Export, "Could not create a Relation Key for item " + item.Id + ". Relation will not be exported."));
+
+					// Exclude invalid key Relation from total list so it is not processed during the export
+					allRelations = allRelations.Except(item.AsEnumerableOfOne());
+				}				
+			}
+			uSyncEvents.Paused = false;
+
+            foreach (var item in allRelations)
 			{
 				if (item != null)
 				{
-					actions.Add(ExportToDisk(item, folder));
+					// If Relation being exported already has a custom Key, process it in the actions queue as usual
+					if(HasRelationKey(item))
+					{
+						actions.Add(ExportToDisk(item, folder));
+					} else
+					{
+						// TODO or throw?						
+						actions.Add(uSyncAction.Fail("Relation " + GetRelationFilename(item), typeof(IRelation), ChangeType.Export, "Relation does not have a custom RelationKey and will not be exported."));
+					}					
 				}
 			}
 
@@ -63,16 +92,21 @@ namespace Jumoo.uSync.Content
 
 			try
 			{
-				var attempt = uSyncCoreContext.Instance.RelationSerializer.Serialize(item);				
-				var filePath = string.Empty;
+				// Ensure Relation has a custom Relation Key before it is Serialized, otherwise it is skipped and reported as a failure
+				if (HasRelationKey(item)) { 					
+					var attempt = uSyncCoreContext.Instance.RelationSerializer.Serialize(item);				
+					var filePath = string.Empty;
 
-				if (attempt.Success)
-				{		
-					filePath = uSyncIOHelper.SavePath(folder, SyncFolder, fileName);
-					uSyncIOHelper.SaveNode(attempt.Item, filePath);
+					if (attempt.Success)
+					{		
+						filePath = uSyncIOHelper.SavePath(folder, SyncFolder, fileName);
+						uSyncIOHelper.SaveNode(attempt.Item, filePath);
+					}
+					return uSyncActionHelper<XElement>.SetAction(attempt, filePath);
+				} else
+				{
+					return uSyncAction.Fail("Relation " + fileName, typeof(IRelation), ChangeType.Export, "Relation does not have a custom RelationKey.");
 				}
-				return uSyncActionHelper<XElement>.SetAction(attempt, filePath);
-
 			}
 			catch (Exception ex)
 			{
@@ -110,12 +144,29 @@ namespace Jumoo.uSync.Content
 			// Ensure each Relation has a custom Key before it is saved
 			foreach (IRelation item in e.SavedEntities)
 			{
-				XElement comment = XElement.Parse(item.Comment);
-				if (comment.Attribute("RelationKey").ValueOrDefault(Guid.Empty).Equals(Guid.Empty))
+				if (!HasRelationKey(item))
 				{
-					comment.SetAttributeValue("RelationKey", Guid.NewGuid());
-					item.Comment = comment.ToString();
-				}
+					if (CreateRelationKey(item).Equals(Guid.Empty))
+					{
+						// Could not create custom Relation key on item. Report, but allow Save to continue
+						LogHelper.Warn<RelationHandler>("Could not create Relation Key for item " + item.Id + " during Saving event.");
+					}
+				}			
+			}
+		}
+		
+		private void RelationService_SavedRelation(IRelationService sender, Umbraco.Core.Events.SaveEventArgs<IRelation> e)
+		{
+			if (uSyncEvents.Paused)
+				return;
+
+			foreach (var item in e.SavedEntities)
+			{
+				string relationName = GetRelationFilename(item);
+				LogHelper.Info<RelationHandler>("Save: Saving uSync file for item: {0}", () => relationName);
+				ExportToDisk(item, uSyncBackOfficeContext.Instance.Configuration.Settings.Folder);
+
+				uSyncBackOfficeContext.Instance.Tracker.RemoveActions(relationName, typeof(IRelation));
 			}
 		}
 
@@ -134,20 +185,36 @@ namespace Jumoo.uSync.Content
 			}
 		}
 
-		private void RelationService_SavedRelation(IRelationService sender, Umbraco.Core.Events.SaveEventArgs<IRelation> e)
+		/// <summary>
+		/// Creates a RelationKey for the specified Relation. If a valid RelationKey already exists a new Key will not be generated.		
+		/// </summary>
+		/// <param name="item">The item.</param>
+		/// <param name="saveIfNewKeyIsCreated">if set to <c>true</c> [save if key is created].</param>
+		/// <returns></returns>
+		private Guid CreateRelationKey(IRelation item)
 		{
-			if (uSyncEvents.Paused)
-				return;
+			Guid key = Guid.Empty;
+			
+			// Some Relation Types don't generate any Comment data so we may have to add some boilerplate before applying our custom Key
+			XElement comment = item.Comment.Length == 0 ? new XElement("RelationMapping") : XElement.Parse(item.Comment);
+			
+			key = comment.Attribute("RelationKey").ValueOrDefault(Guid.Empty);
 
-			foreach (var item in e.SavedEntities)
+			if (key.Equals(Guid.Empty))
 			{
-				string relationName = GetRelationFilename(item);
-				LogHelper.Info<RelationHandler>("Save: Saving uSync file for item: {0}", () => relationName);
-				ExportToDisk(item, uSyncBackOfficeContext.Instance.Configuration.Settings.Folder);
-
-				uSyncBackOfficeContext.Instance.Tracker.RemoveActions(relationName, typeof(IRelation));
+				key = Guid.NewGuid();
+				comment.SetAttributeValue("RelationKey", key);
+				item.Comment = comment.ToString();				
 			}
+
+			return key;
 		}
+
+		private bool HasRelationKey(IRelation item)
+		{
+			XElement comment = item.Comment.Length > 0 ? XElement.Parse(item.Comment) : null;
+			return comment != null && !comment.Attribute("RelationKey").ValueOrDefault(Guid.Empty).Equals(Guid.Empty);
+        }
 
 		public override uSyncAction ReportItem(string file)
 		{
@@ -168,8 +235,8 @@ namespace Jumoo.uSync.Content
 		/// <returns></returns>
 		private string GetRelationFilename(IRelation relation)
 		{
-			XElement comment = XElement.Parse(relation.Comment);
-			Guid relationKey = comment.Attribute("RelationKey").ValueOrDefault(Guid.Empty);
+			XElement comment = relation.Comment.Length > 0 ? XElement.Parse(relation.Comment) : null;
+			Guid relationKey = comment != null ? comment.Attribute("RelationKey").ValueOrDefault(Guid.Empty) : Guid.Empty;
 			string fileNameKeyString = relationKey.Equals(Guid.Empty) ? Guid.NewGuid().ToString() + "_TEMP" : relationKey.ToString();
 			string fileName = relation.RelationType.Alias + "_" + fileNameKeyString;
 
