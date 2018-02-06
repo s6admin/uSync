@@ -67,13 +67,7 @@ namespace Jumoo.uSync.Core.Extensions
 
             if (node.Element("Key") != null)
                 return node.Element("Key").ValueOrDefault(Guid.Empty);
-
-			Guid key = node.ValueOrDefault(Guid.Empty);
-			if (!key.Equals(Guid.Empty))
-			{
-				return key;
-			}
-
+			
             return Guid.Empty;
         }
 

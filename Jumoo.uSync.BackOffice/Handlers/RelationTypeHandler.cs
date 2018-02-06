@@ -104,11 +104,11 @@ namespace Jumoo.uSync.BackOffice.Handlers
 		}
 
 		public void RegisterEvents()
-		{
+		{		
 			RelationService.SavedRelationType += RelationService_SavedRelationType;
 			RelationService.DeletedRelationType += RelationService_DeletedRelationType;
 		}
-
+		
 		private void RelationService_DeletedRelationType(IRelationService sender, Umbraco.Core.Events.DeleteEventArgs<IRelationType> e)
 		{
 			if (uSyncEvents.Paused)

@@ -38,17 +38,20 @@ namespace Jumoo.uSync.Core.Serializers
 		internal override SyncAttempt<IRelation> DeserializeCore(XElement node)
 		{
 			/* 				
-				Sinces Relations don't have persisted Keys and Aliases can be changed from the Umbraco backoffice
-				we need to use a combination of relType + parentId + childId to reliably identify matching Relation 
-				records during a deserializing/import.			 
+				Since Relations don't have persisted Keys and Aliases can be changed from the Umbraco backoffice
+				we attempt to distinguish each processed Relation with a custom RelationKey Guid added to the
+				Comment data. If that is not available the fallback (vanilla Umbraco) is to use a key 
+				combination of parentId + childId + relType which matches the database table IX constraint
 			 */
 			string relationName = GetRelationNameLabel(node);			
-			Guid childKey = node.Element("ChildKey").KeyOrDefault();
-			Guid parentKey = node.Element("ParentKey").KeyOrDefault();
-			Guid relationTypeKey = node.Element("RelationTypeKey").KeyOrDefault();
-			Guid propertyTypeKey = node.Element("PropertyTypeKey").KeyOrDefault();
-			Guid dataTypeDefinitionKey = node.Element("DataTypeDefinitionKey").KeyOrDefault();
+			Guid childKey = node.Element("ChildKey").ValueOrDefault(Guid.Empty);
+			Guid parentKey = node.Element("ParentKey").ValueOrDefault(Guid.Empty);
+			Guid relationKey = Guid.Empty; // May come from Comment data
+			Guid relationTypeKey = node.Element("RelationTypeKey").ValueOrDefault(Guid.Empty);
+			Guid propertyTypeKey = node.Element("PropertyTypeKey").ValueOrDefault(Guid.Empty);
+			Guid dataTypeDefinitionKey = node.Element("DataTypeDefinitionKey").ValueOrDefault(Guid.Empty);
 			string relationTypeAlias = node.Element("RelationTypeAlias").ValueOrDefault(string.Empty);
+			
 						
 			if (childKey.Equals(Guid.Empty)) {
 				string msg = "Could not find ChildKey to deserialize for " + relationName;
@@ -126,43 +129,97 @@ namespace Jumoo.uSync.Core.Serializers
 				return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
 			}
 
-			XElement relationMapping = XElement.Parse(node.Element("Comment").ValueOrDefault(string.Empty));			
-			if (relationMapping == null)
+			XElement relationMappingComment = XElement.Parse(node.Element("Comment").ValueOrDefault(string.Empty));			
+			if (relationMappingComment == null)
 			{				
 				string msg = "Could not deserialize relation mapping xml node for " + relationName;
 				LogHelper.Warn(typeof(RelationSerializer), msg);
 				return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
 			} else
 			{
-				// Ensure values in Comment node are updated and correct before we				
-				relationMapping.Attribute("PropertyTypeId").SetValue(propertyType.Id); 				
-				relationMapping.Attribute("DataTypeDefinitionId").SetValue(dataTypeDefinition.Id);                
+				
+				// Ensure Id values in Comment node are updated and correct for the target environment before continuing with import
+				relationMappingComment.Attribute("PropertyTypeId").SetValue(propertyType.Id); 				
+				relationMappingComment.Attribute("DataTypeDefinitionId").SetValue(dataTypeDefinition.Id);
+
+				// Get Relation Key from Comment if one exists. Do NOT create a Key here. That is performed during the Relation's Saving event
+				relationKey = relationMappingComment.Attribute("RelationKey").ValueOrDefault(Guid.Empty);					
 			}
 
 			// Look for existing relation record
 			var relation = default(IRelation);
-			var allRelations = relationService.GetAllRelationsByRelationType(relationType.Id);						
-			if(allRelations != null && allRelations.Any()) 
+			var allRelationsByType = relationService.GetAllRelationsByRelationType(relationType.Id);						
+			if(allRelationsByType != null && allRelationsByType.Any()) 
 			{
-				relation = allRelations.FirstOrDefault(x => x.ChildId == child.Id && x.ParentId == parent.Id && x.RelationType.Alias == relationType.Alias);
+				// Primary match by custom Relation Key
+				if (!relationKey.Equals(Guid.Empty))
+				{					
+					relation = allRelationsByType.FirstOrDefault(x =>
+						(x.Comment != null &&
+						XElement.Parse(x.Comment).Attribute("RelationKey").ValueOrDefault(Guid.Empty).Equals(relationKey)));
+				}
+
+				// If Relation by custom Key isn't found, use default Umbraco Ids
+				if(relation == null)
+				{
+					relation = allRelationsByType.FirstOrDefault(x => x.ChildId == child.Id && x.ParentId == parent.Id);
+					
+					// If relation type is bi check the opposite parent/child direction and consider it a match, otherwise we'd create a second/reverse relation record for the same relationship
+					if (relation == null && relationType.IsBidirectional)
+					{
+						relation = allRelationsByType.FirstOrDefault(x => x.ChildId == parent.Id && x.ParentId == child.Id);
+					}
+				}				
             }
-			
+						
 			if (relation == default(IRelation))
 			{
 				// No matching relation record found, create a new one				
-				relation = new Relation(parent.Id, child.Id, relationType);								
+				relation = new Relation(parent.Id, child.Id, relationType);
+												
+				//if (relationKey.Equals(Guid.Empty))
+				//{
+				//	relationKey = Guid.NewGuid();					
+				//}
+				
+				//relationMappingComment.SetAttributeValue("RelationKey", relationKey);
+
+			} else
+			{
+				// Update Relation Key if a valid value was provided in the imported Comment data
+				XElement existingMapping = XElement.Parse(relation.Comment);
+				//if (existingMapping != null)
+				//{
+				//	Guid existingKey = existingMapping.Attribute("RelationKey").ValueOrDefault(Guid.Empty);
+    //                if (existingKey.Equals(Guid.Empty)) {
+				//		// Existing relation does not have a custom RelationKey, assign one from node Comment attribute, otherwise create a new one
+				//		if (relationKey.Equals(Guid.Empty))
+				//		{
+				//			relationKey = Guid.NewGuid();
+				//		}
+				//		relationMappingComment.SetAttributeValue("RelationKey", relationKey);
+				//	}
+				//	else
+				//	{
+				//		// Existing Relation already has a custom Key, overwrite it with relationKey from node Comment data if it is valid
+				//		if (!relationKey.Equals(Guid.Empty) && !existingKey.Equals(relationKey))
+				//		{
+				//			existingMapping.SetAttributeValue("RelationKey", relationKey);
+				//		}
+				//	}
+    //            }
 			}
-			
+
 			// Update relation record values
 			relation.ChildId = child.Id;
 			relation.ParentId = parent.Id;
-			relation.Comment = relationMapping.ToString();
+			relation.Comment = relationMappingComment.ToString();
 
 			bool saved;
 
 			try
 			{
-				relationService.Save(relation); // TODO Save record once we've confirmed properties are correct
+				relationService.Save(relation); 
 				saved = true;
 			} catch(Exception ex)
 			{
@@ -205,6 +262,7 @@ namespace Jumoo.uSync.Core.Serializers
 			int dataTypeDefinitionId = -1;
 			string propertyTypeKeyValue = string.Empty;
 			string dataTypeDefinitionKeyValue = string.Empty;
+			Guid relationKey = Guid.Empty;
 			XElement relationMappingComment = XElement.Parse(relation.Comment);
 
 			if (relationMappingComment != null)
@@ -249,6 +307,14 @@ namespace Jumoo.uSync.Core.Serializers
 					LogHelper.Warn(typeof(RelationSerializer), msg);
 					return SyncAttempt<XElement>.Fail(GetRelationNameLabel(relation), ChangeType.Export, msg);
 				}
+
+				// Look for our custom RelationKey, otherwise create one
+				relationKey = relationMappingComment.Attribute("RelationKey").ValueOrDefault(Guid.Empty);
+				if (relationKey.Equals(Guid.Empty))
+				{
+					relationKey = Guid.NewGuid();
+					relationMappingComment.SetAttributeValue("RelationKey", relationKey); 					
+				}
 			}
 						
 			node.Add(new XElement("ChildId", relation.ChildId));
@@ -256,11 +322,11 @@ namespace Jumoo.uSync.Core.Serializers
 			node.Add(new XElement("ParentId", relation.ParentId)); 
 			node.Add(new XElement("ParentKey", parent.Key));
 			node.Add(new XElement("RelationTypeAlias", relation.RelationType.Alias));		
-			node.Add(new XElement("RelationTypeKey", relation.RelationType.Key)); // TODO RelationTypeKey doesn't appear to match between environments. Should they be updated on import?
-			node.Add(new XElement("Comment", relation.Comment)); 
+			node.Add(new XElement("RelationTypeKey", relation.RelationType.Key)); 
+			node.Add(new XElement("Comment", relationMappingComment)); // Includes custom RelationKey if exists
 			node.Add(new XElement("PropertyTypeKey", propertyTypeKeyValue));
 			node.Add(new XElement("DataTypeDefinitionKey", dataTypeDefinitionKeyValue));
-
+			
 			return SyncAttempt<XElement>.SucceedIf(
 			node != null, GetRelationNameLabel(relation), node, typeof(IRelation), ChangeType.Export);
 		}
@@ -278,7 +344,7 @@ namespace Jumoo.uSync.Core.Serializers
 				item = GetRelation(node); 
 			} catch(Exception ex)
 			{
-				// If an Exception is thrown during IsUpdate it should be surpressed because the missing item(s) that cased the error may be a part of the Import process.
+				// If an Exception is thrown during IsUpdate (ie. an import "Report") it should be surpressed in case the missing item(s) that caused the error are part of the Import process.
 				// TODO We may be able to check for this case deeper in the uSync core, but is only a "nice to have"
 			}
 
@@ -365,10 +431,10 @@ namespace Jumoo.uSync.Core.Serializers
 		/// <returns></returns>
 		private IRelation GetRelation(XElement node)
 		{
-						
-			Guid childKey = node.Element("ChildKey").KeyOrDefault();
-			Guid parentKey = node.Element("ParentKey").KeyOrDefault();
-			Guid relationTypeKey = node.Element("RelationTypeKey").KeyOrDefault();
+
+			Guid childKey = node.Element("ChildKey").ValueOrDefault(Guid.Empty);
+			Guid parentKey = node.Element("ParentKey").ValueOrDefault(Guid.Empty);
+			Guid relationTypeKey = node.Element("RelationTypeKey").ValueOrDefault(Guid.Empty);
 			string relationTypeAlias = node.Element("RelationTypeAlias").ValueOrDefault(string.Empty);
 			IRelation relation = null;
 			IRelationType relationType = null;
@@ -429,15 +495,24 @@ namespace Jumoo.uSync.Core.Serializers
 
 		public string GetRelationNameLabel(IRelation relation)
 		{
-			return "Relation " + relation.Id;
+			XElement comment = XElement.Parse(relation.Comment);
+			Guid relationKey = comment.Attribute("RelationKey").ValueOrDefault(Guid.Empty);
+			string fileNameKey = relationKey.Equals(Guid.Empty) ? Guid.NewGuid().ToString() + "_TEMP" : relationKey.ToString();
+
+			return "Relation " + relation.Id + " " + fileNameKey;
 		}
 
 		public string GetRelationNameLabel(XElement node)
 		{
-			string label = node.Element("Comment").Attribute("PropertyTypeId").ValueOrDefault(string.Empty) +
-				"Parent: " + node.Element("ParentId").ValueOrDefault(string.Empty) +
-				" Child: " + node.Element("ChildId").ValueOrDefault(string.Empty);
-			return "Relation " + label;
+			Guid relationKey = node.Element("Comment").Attribute("RelationKey").ValueOrDefault(Guid.Empty);
+			string fileNameKey = relationKey.Equals(Guid.Empty) ? Guid.NewGuid().ToString() + "_TEMP" : relationKey.ToString();
+
+			//string label = node.Element("Id").ValueOrDefault(string.Empty) + 
+			//	node.Element("Comment").Attribute("PropertyTypeAlias").ValueOrDefault(string.Empty) +				
+			//	" Parent: " + node.Element("ParentId").ValueOrDefault(string.Empty) +
+			//	" Child: " + node.Element("ChildId").ValueOrDefault(string.Empty);
+
+			return "Relation " + fileNameKey;
 		}
 
 		internal int GetIdFromGuid(Guid guid)

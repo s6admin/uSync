@@ -76,7 +76,7 @@ namespace Jumoo.uSync.Content
 			}
 			catch (Exception ex)
 			{
-				return uSyncAction.Fail("Relation" + fileName, item.GetType(), ChangeType.Export, ex);
+				return uSyncAction.Fail("Relation " + fileName, item.GetType(), ChangeType.Export, ex);
 			}
 		}
 
@@ -95,8 +95,28 @@ namespace Jumoo.uSync.Content
 
 		public void RegisterEvents()
 		{
+			RelationService.SavingRelation += RelationService_SavingRelation;
 			RelationService.SavedRelation += RelationService_SavedRelation;
 			RelationService.DeletedRelation += RelationService_DeletedRelation;			
+		}
+
+		private void RelationService_SavingRelation(IRelationService sender, Umbraco.Core.Events.SaveEventArgs<IRelation> e)
+		{
+			if (uSyncEvents.Paused)
+			{
+				return;
+			}
+
+			// Ensure each Relation has a custom Key before it is saved
+			foreach (IRelation item in e.SavedEntities)
+			{
+				XElement comment = XElement.Parse(item.Comment);
+				if (comment.Attribute("RelationKey").ValueOrDefault(Guid.Empty).Equals(Guid.Empty))
+				{
+					comment.SetAttributeValue("RelationKey", Guid.NewGuid());
+					item.Comment = comment.ToString();
+				}
+			}
 		}
 
 		private void RelationService_DeletedRelation(IRelationService sender, Umbraco.Core.Events.DeleteEventArgs<IRelation> e)
@@ -147,17 +167,29 @@ namespace Jumoo.uSync.Content
 		/// <param name="relation">The relation.</param>
 		/// <returns></returns>
 		private string GetRelationFilename(IRelation relation)
-		{						
-			string fileName = relation.RelationType.Alias + "_" + relation.ParentId + "_" + relation.ChildId;
+		{
+			XElement comment = XElement.Parse(relation.Comment);
+			Guid relationKey = comment.Attribute("RelationKey").ValueOrDefault(Guid.Empty);
+			string fileNameKeyString = relationKey.Equals(Guid.Empty) ? Guid.NewGuid().ToString() + "_TEMP" : relationKey.ToString();
+			string fileName = relation.RelationType.Alias + "_" + fileNameKeyString;
+
+			//string fileName = relation.RelationType.Alias + "_" + relation.ParentId + "_" + relation.ChildId;
+			//string fileName = relation.RelationType.Alias + "" + relation.Id;
 			
 			return fileName;
 		}
 
 		private string GetRelationFilename(XElement node)
 		{
-			string fileName = node.Element("Comment").Attribute("PropertyTypeId").ValueOrDefault(string.Empty) +
-				"Parent: " + node.Element("ParentId").ValueOrDefault(string.Empty) +
-				" Child: " + node.Element("ChildId").ValueOrDefault(string.Empty);
+			
+			Guid relationKey = node.Element("Comment").Attribute("RelationKey").ValueOrDefault(Guid.Empty);
+			string fileNameKeyString = relationKey.Equals(Guid.Empty) ? Guid.NewGuid().ToString() + "_TEMP" : relationKey.ToString();
+			
+			string fileName = node.Element("Comment").Attribute("PropertyTypeAlias").ValueOrDefault(string.Empty) + "_" +
+				fileNameKeyString;
+				//node.Element("Id").ValueOrDefault(string.Empty);
+				//"Parent: " + node.Element("ParentId").ValueOrDefault(string.Empty) +
+				//" Child: " + node.Element("ChildId").ValueOrDefault(string.Empty);
 
 			return "Relation " + fileName;						
 		}

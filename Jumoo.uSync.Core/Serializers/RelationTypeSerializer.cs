@@ -10,20 +10,20 @@ using Umbraco.Core.Services;
 using Jumoo.uSync.Core.Extensions;
 using Jumoo.uSync.Core.Helpers;
 using Umbraco.Core.Logging;
+using Umbraco.Core.Events;
 
 namespace Jumoo.uSync.Core.Serializers
 {
 	public class RelationTypeSerializer : SyncBaseSerializer<IRelationType>, ISyncChangeDetail
 	{
 		private readonly IRelationService relationService;
-		private const string NODE_NAME = "RelationType";
-
+		private const string NODE_NAME = "RelationType";		
 		public override string SerializerType => uSyncConstants.Serailization.RelationType;
 
 		public RelationTypeSerializer()
 			: base(uSyncConstants.Serailization.RelationType)
 		{
-			relationService = ApplicationContext.Current.Services.RelationService;
+			relationService = ApplicationContext.Current.Services.RelationService;			
 		}
 
 		public RelationTypeSerializer(string itemType) : base(itemType) { }
@@ -34,14 +34,14 @@ namespace Jumoo.uSync.Core.Serializers
 		/// <param name="node">The node.</param>
 		/// <returns></returns>
 		internal override SyncAttempt<IRelationType> DeserializeCore(XElement node)
-		{
-			var relationTypeAlias = node.Element("Alias").ValueOrDefault(""); 
+		{			
+			var relationTypeAlias = node.Element("Alias").ValueOrDefault(string.Empty); 
 			if (string.IsNullOrEmpty(relationTypeAlias))
 				return SyncAttempt<IRelationType>.Fail(node.NameFromNode(), ChangeType.Import, "Missing RelationType Alias");
 
-			Guid relationTypeKey = node.Element("Key").KeyOrDefault();
-			Guid childTypeKey = node.Element("ChildObjectType").KeyOrDefault();
-			Guid parentTypeKey = node.Element("ParentObjectType").KeyOrDefault();
+			Guid relationTypeKey = node.Element("Key").ValueOrDefault(Guid.Empty);
+			Guid childTypeKey = node.Element("ChildObjectType").ValueOrDefault(Guid.Empty);
+			Guid parentTypeKey = node.Element("ParentObjectType").ValueOrDefault(Guid.Empty);
 			
 			if (relationTypeKey.Equals(Guid.Empty))
 			{
@@ -64,19 +64,13 @@ namespace Jumoo.uSync.Core.Serializers
 				return SyncAttempt<IRelationType>.Fail(node.NameFromNode(), ChangeType.Import, msg);
 			}
 
-			// All required properties are available
+			// All required properties are available, proceed with deserialization attempt below...
+			var allRelationTypes = relationService.GetAllRelationTypes(); // Get relationTypes ONCE and maintain locally so we don't hit the db so often
 
-			var allRelationTypes = relationService.GetAllRelationTypes();
-
-			var relationType = default(IRelationType);
-			if (allRelationTypes.Any(x => x.Alias == relationTypeAlias)) // S6 TODO What about prioritizing Key to locate a matching type before using Alias?
-			{
-				relationType = allRelationTypes.FirstOrDefault(x => x.Alias == relationTypeAlias); 
-			}
-
+			IRelationType relationType = allRelationTypes.FirstOrDefault(x => x.Alias == relationTypeAlias); // S6 TODO Prioritize Key over Alias			
 			if (relationType == default(IRelationType))
 			{				
-				relationType = new RelationType(childTypeKey, parentTypeKey, relationTypeAlias);				
+				relationType = new RelationType(childTypeKey, parentTypeKey, relationTypeAlias);			
             }
 
 			relationType.Key = relationTypeKey;
@@ -86,8 +80,8 @@ namespace Jumoo.uSync.Core.Serializers
 			bool saved;
 			try
 			{
-				relationService.Save(relationType); // S6 TODO after we've successfully profiled this far
-				saved = true;
+				relationService.Save(relationType); 
+				saved = true;				
 			}
 			catch(Exception ex)
 			{
@@ -110,7 +104,7 @@ namespace Jumoo.uSync.Core.Serializers
 			node.Add(new XElement("Alias", item.Alias));
 			node.Add(new XElement("ChildObjectType", item.ChildObjectType));			
 			node.Add(new XElement("IsBidirectional", item.IsBidirectional));
-			//node.Add(new XElement("Id", item.Key)); // NOTE Id is the primary database key of a RelationType and cannot be modified/updated by. The Key is used instead because without an <Id> node uSync automatically flags the item as a DELETE action
+			//node.Add(new XElement("Id", item.Id)); 
 			node.Add(new XElement("Key", item.Key));
 			node.Add(new XElement("Name", item.Name));			
 			node.Add(new XElement("ParentObjectType", item.ParentObjectType));
@@ -128,7 +122,7 @@ namespace Jumoo.uSync.Core.Serializers
 			if (string.IsNullOrEmpty(nodeHash))
 				return true;
 			
-			Guid relationTypeKey = node.Element("Key").KeyOrDefault();			
+			Guid relationTypeKey = node.Element("Key").ValueOrDefault(Guid.Empty);			
 			if (relationTypeKey.Equals(Guid.Empty))
 				return true;
 
@@ -151,15 +145,14 @@ namespace Jumoo.uSync.Core.Serializers
             return (!hashesMatch);
 
 		}
-
-
+		
 		public IEnumerable<uSyncChange> GetChanges(XElement node)
 		{
 			var nodeHash = node.GetSyncHash();
 			if (string.IsNullOrEmpty(nodeHash))
 				return null;
 
-			Guid relationTypeKey = node.Element("Key").KeyOrDefault();			
+			Guid relationTypeKey = node.Element("Key").ValueOrDefault(Guid.Empty);			
 			if (relationTypeKey.Equals(Guid.Empty))
 			{
 				return null; //return uSyncChangeTracker.ChangeError(node.NameFromNode());
