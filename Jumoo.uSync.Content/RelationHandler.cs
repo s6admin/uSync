@@ -53,7 +53,7 @@ namespace Jumoo.uSync.Content
 				} else
 				{
 					// Could not create a key on this Relation (ie. bad Comment data)
-					actions.Add(uSyncAction.Fail("Relation " + GetRelationFilename(item), typeof(IRelation), ChangeType.Export, "Could not create a Relation Key for item " + item.Id + ". Relation will not be exported."));
+					actions.Add(uSyncAction.Fail("Relation " + GetRelationLabel(item), typeof(IRelation), ChangeType.Export, "Could not create a Relation Key for item " + item.Id + ". Relation will not be exported."));
 
 					// Exclude invalid key Relation from total list so it is not processed during the export
 					allRelations = allRelations.Except(item.AsEnumerableOfOne());
@@ -72,7 +72,7 @@ namespace Jumoo.uSync.Content
 					} else
 					{
 						// TODO or throw?						
-						actions.Add(uSyncAction.Fail("Relation " + GetRelationFilename(item), typeof(IRelation), ChangeType.Export, "Relation does not have a custom RelationKey and will not be exported."));
+						actions.Add(uSyncAction.Fail("Relation " + GetRelationLabel(item), typeof(IRelation), ChangeType.Export, "Relation does not have a custom RelationKey and will not be exported."));
 					}					
 				}
 			}
@@ -105,12 +105,12 @@ namespace Jumoo.uSync.Content
 					return uSyncActionHelper<XElement>.SetAction(attempt, filePath);
 				} else
 				{
-					return uSyncAction.Fail("Relation " + fileName, typeof(IRelation), ChangeType.Export, "Relation does not have a custom RelationKey.");
+					return uSyncAction.Fail("Relation " + GetRelationLabel(item), typeof(IRelation), ChangeType.Export, "Relation does not have a custom RelationKey.");
 				}
 			}
 			catch (Exception ex)
 			{
-				return uSyncAction.Fail("Relation " + fileName, item.GetType(), ChangeType.Export, ex);
+				return uSyncAction.Fail("Relation " + GetRelationLabel(item), item.GetType(), ChangeType.Export, ex);
 			}
 		}
 
@@ -219,7 +219,8 @@ namespace Jumoo.uSync.Content
 		public override uSyncAction ReportItem(string file)
 		{
 			var node = XElement.Load(file);
-			string itemName = GetRelationFilename(node);
+
+			string itemName = "Relation " + file.Substring(file.LastIndexOf("\\") + 1);			            
 			bool update = update = uSyncCoreContext.Instance.RelationSerializer.IsUpdate(node);			
 			var action = uSyncActionHelper<IRelation>.ReportAction(update, itemName);
 			if (action.Change > ChangeType.NoChange)
@@ -237,28 +238,21 @@ namespace Jumoo.uSync.Content
 		{
 			XElement comment = relation.Comment.Length > 0 ? XElement.Parse(relation.Comment) : null;
 			Guid relationKey = comment != null ? comment.Attribute("RelationKey").ValueOrDefault(Guid.Empty) : Guid.Empty;
-			string fileNameKeyString = relationKey.Equals(Guid.Empty) ? Guid.NewGuid().ToString() + "_TEMP" : relationKey.ToString();
+			string fileNameKeyString = relationKey.Equals(Guid.Empty) ? relation.Id.ToString() : relationKey.ToString();
 			string fileName = relation.RelationType.Alias + "_" + fileNameKeyString;
-
-			//string fileName = relation.RelationType.Alias + "_" + relation.ParentId + "_" + relation.ChildId;
-			//string fileName = relation.RelationType.Alias + "" + relation.Id;
-			
+						
 			return fileName;
 		}
 
-		private string GetRelationFilename(XElement node)
+		private string GetRelationLabel(IRelation relation)
 		{
-			
-			Guid relationKey = node.Element("Comment").Attribute("RelationKey").ValueOrDefault(Guid.Empty);
-			string fileNameKeyString = relationKey.Equals(Guid.Empty) ? Guid.NewGuid().ToString() + "_TEMP" : relationKey.ToString();
-			
-			string fileName = node.Element("Comment").Attribute("PropertyTypeAlias").ValueOrDefault(string.Empty) + "_" +
-				fileNameKeyString;
-				//node.Element("Id").ValueOrDefault(string.Empty);
-				//"Parent: " + node.Element("ParentId").ValueOrDefault(string.Empty) +
-				//" Child: " + node.Element("ChildId").ValueOrDefault(string.Empty);
+			XElement comment = relation.Comment.Length > 0 ? XElement.Parse(relation.Comment) : null;
+			Guid relationKey = comment != null ? comment.Attribute("RelationKey").ValueOrDefault(Guid.Empty) : Guid.Empty;
 
-			return "Relation " + fileName;						
+			string label = "Relation ";
+			label += !relationKey.Equals(Guid.Empty) ? relationKey.ToString() : relation.Id.ToString();
+
+			return label;
 		}
 	}
 }
