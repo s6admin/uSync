@@ -46,12 +46,12 @@ namespace Jumoo.uSync.Core.Serializers
 			string relationName = GetRelationNameLabel(node);			
 			Guid childKey = node.Element("ChildKey").ValueOrDefault(Guid.Empty);
 			Guid parentKey = node.Element("ParentKey").ValueOrDefault(Guid.Empty);
-			Guid relationKey = Guid.Empty; // May come from Comment data
+			Guid relationKey = node.Element("RelationKey").ValueOrDefault(Guid.Empty); 
 			Guid relationTypeKey = node.Element("RelationTypeKey").ValueOrDefault(Guid.Empty);
 			Guid propertyTypeKey = node.Element("PropertyTypeKey").ValueOrDefault(Guid.Empty);
 			Guid dataTypeDefinitionKey = node.Element("DataTypeDefinitionKey").ValueOrDefault(Guid.Empty);
-			string relationTypeAlias = node.Element("RelationTypeAlias").ValueOrDefault(string.Empty);
-			XElement relationComment = null;
+			string propertyAlias = node.Element("PropertyAlias").ValueOrDefault(string.Empty);
+			string relationTypeAlias = node.Element("RelationTypeAlias").ValueOrDefault(string.Empty);			
 			bool convertCommentIds = false;
 
 			#region Ensure Required data is present
@@ -74,45 +74,41 @@ namespace Jumoo.uSync.Core.Serializers
 				return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
 			}
 
-			relationComment = XElement.Parse(node.Element("Comment").ValueOrDefault(string.Empty));
-			if (relationComment == null) //TODO THis is never null
+			// PropertyAlias, PropertyTypeKey and DataTypeDefinitionKey are part of nuPicker RelationMapping 
+			// but are not present for vanilla Relation records so they need to be processed as a group if they are detected.
+			// They must either be all present or all omitted otherwise we won't allow the Relation to be imported
+			if(propertyAlias.IsNullOrWhiteSpace() && propertyTypeKey.Equals(Guid.Empty) && dataTypeDefinitionKey.Equals(Guid.Empty))
 			{
-				string msg = "No RelationMapping data was found to deserialize for " + relationName;
-				LogHelper.Warn(typeof(RelationSerializer), msg);
-				return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
-			}
-			else if(relationComment.Element("RelationMapping") != null)
+				// A non-nuPicker relation is being processed (but still has our custom Relation Key wrapped in the <RelationMapping> tag
+				convertCommentIds = false;
+			} else
 			{
-				// PropertyAlias, PropertyTypeKey and DataTypeDefinitionKey are part of nuPicker RelationMapping 
-				// but are not required for vanilla Relation records so they need to be processed as a group if .
-				// They must either be all present or all omitted otherwise we won't allow the Relation to be imported
 
-				string propertyAlias = relationComment.Attribute("PropertyAlias").ValueOrDefault(string.Empty);
+				convertCommentIds = true;
 
-				// If all three properties are absent the comment doesn't require any Id processing and is deserialized as-is
-				if (propertyAlias.IsNullOrWhiteSpace() && propertyTypeKey.Equals(Guid.Empty) && dataTypeDefinitionKey.Equals(Guid.Empty))
+				// Verify that each required key is present to map PropertyTypeId and DataTypeDefinitionId
+
+				if (propertyAlias.IsNullOrWhiteSpace())
 				{
-					// A non-nuPicker relation is being processed (but still has our custom Relation Key wrapped in the <RelationMapping> tag
-					convertCommentIds = false;
-				} else
+					string msg = "Could not find required PropertyAlias to deserialize for " + relationName;
+					LogHelper.Warn(typeof(RelationSerializer), msg);
+					return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
+				}
+				
+				if (propertyTypeKey.Equals(Guid.Empty))
 				{
-					convertCommentIds = true;
-					// Verify that each required key is present to map PropertyTypeId and DataTypeDefinitionId
-					if (propertyTypeKey.Equals(Guid.Empty))
-					{
-						string msg = "Could not find required PropertyTypeKey to deserialize for " + relationName;
-						LogHelper.Warn(typeof(RelationSerializer), msg);
-						return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
-					}
-					if (dataTypeDefinitionKey.Equals(Guid.Empty))
-					{
-						string msg = "Could not find required DataTypeDefinitionKey to deserialize for " + relationName;
-						LogHelper.Warn(typeof(RelationSerializer), msg);
-						return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
-					}
-				}											
+					string msg = "Could not find required PropertyTypeKey to deserialize for " + relationName;
+					LogHelper.Warn(typeof(RelationSerializer), msg);
+					return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
+				}
+				if (dataTypeDefinitionKey.Equals(Guid.Empty))
+				{
+					string msg = "Could not find required DataTypeDefinitionKey to deserialize for " + relationName;
+					LogHelper.Warn(typeof(RelationSerializer), msg);
+					return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
+				}
 			}
-
+			
 			#endregion Ensure Required data is present
 
 			#region Deserialize data
@@ -146,8 +142,13 @@ namespace Jumoo.uSync.Core.Serializers
 				}				
 			}
 
+			XElement relationComment = new XElement("RelationMapping");
+			relationComment.SetAttributeValue("RelationKey", relationKey);
+
 			if (convertCommentIds)
 			{
+				// TODO Confirm propertyAlias exists in target environment
+
 				PropertyType propertyType = child.PropertyTypes.Concat(parent.PropertyTypes).FirstOrDefault(x => x.Key == propertyTypeKey);
 				if (propertyType == null)
 				{
@@ -167,14 +168,12 @@ namespace Jumoo.uSync.Core.Serializers
 				if (relationComment.Element("RelationMapping") != null)
 				{
 					// Ensure Id values in Comment node are updated and correct for the target environment before continuing with import
-					relationComment.Attribute("PropertyTypeId").SetValue(propertyType.Id);
-					relationComment.Attribute("DataTypeDefinitionId").SetValue(dataTypeDefinition.Id);
+					relationComment.SetAttributeValue("PropertyAlias", propertyAlias);
+					relationComment.SetAttributeValue("PropertyTypeId", propertyType.Id);
+					relationComment.SetAttributeValue("DataTypeDefinitionId", dataTypeDefinition.Id);
 				}
 			}
-
-			// Get Relation Key from Comment if one exists. Do NOT create a Key here. That is performed during the Relation's Saving event
-			relationKey = relationComment.Attribute("RelationKey").ValueOrDefault(Guid.Empty);
-
+			
 			// Look for existing relation record
 			var relation = default(IRelation);
 			var allRelationsByType = relationService.GetAllRelationsByRelationType(relationType.Id);						
@@ -261,59 +260,75 @@ namespace Jumoo.uSync.Core.Serializers
 			int dataTypeDefinitionId = -1;
 			string propertyTypeKeyValue = string.Empty;
 			string dataTypeDefinitionKeyValue = string.Empty;
+			string propertyAliasValue = string.Empty;
 			Guid relationKey = Guid.Empty;
-			XElement relationMappingComment = relation.Comment.Length > 0 ? XElement.Parse(relation.Comment) : null;
+			XElement relationComment = relation.Comment.Length > 0 ? XElement.Parse(relation.Comment) : null;
+			bool convertCommentIds = false;
+			string relationLabel = GetRelationNameLabel(relation);
 
-			if (relationMappingComment != null)
-			{				
-				propertyTypeId = relationMappingComment.Attribute("PropertyTypeId").ValueOrDefault(-1);				
+			if (relationComment != null)
+			{
+
+				// If propertyAlias, propertyTypeKey, and dataTypeDefinitionKey are all present and valid include them in the exported data
+				// If they are only partially-present warn which property is missing and return a Failed SyncAttempt
+				// If none are present the relation can be exported as long as a RelationKey is available
+
+				propertyAliasValue = relationComment.Attribute("PropertyAlias").ValueOrDefault(string.Empty);
+
+				propertyTypeId = relationComment.Attribute("PropertyTypeId").ValueOrDefault(-1);								
 				if (propertyTypeId > 0)
 				{
 					PropertyType propertyType = child.PropertyTypes.Concat(parent.PropertyTypes).FirstOrDefault(x => x.Id == propertyTypeId);
 					if (propertyType != null)
 					{
 						propertyTypeKeyValue = propertyType.Key.ToString();
-					} else
-					{
-						string msg = "PropertyType not found for propertyTypeId " + propertyTypeId;
-						LogHelper.Warn(typeof(RelationSerializer), msg);
-						//return SyncAttempt<XElement>.Fail(GetRelationNameLabel(relation), ChangeType.Export, msg);
-					}
-                } else
-				{
-					string msg = "PropertyTypeId could not be retrieved from Relation Comment XML data.";					
-					LogHelper.Warn(typeof(RelationSerializer), msg);
-					//return SyncAttempt<XElement>.Fail(GetRelationNameLabel(relation), ChangeType.Export, msg);
-				}
+					} 
+                } 
 
-				dataTypeDefinitionId = relationMappingComment.Attribute("DataTypeDefinitionId").ValueOrDefault(-1);
-
+				dataTypeDefinitionId = relationComment.Attribute("DataTypeDefinitionId").ValueOrDefault(-1);
 				if(dataTypeDefinitionId > 0)
 				{
 					IDataTypeDefinition dataTypeDefinition = dataTypeService.GetDataTypeDefinitionById(dataTypeDefinitionId);
 					if(dataTypeDefinition != null)
 					{
 						dataTypeDefinitionKeyValue = dataTypeDefinition.Key.ToString();
-                    } else
-					{
-						string msg = "Data type definition " + dataTypeDefinitionId + " was not found for " + GetRelationNameLabel(relation);
-						LogHelper.Warn(typeof(RelationSerializer), msg);
-						//return SyncAttempt<XElement>.Fail(GetRelationNameLabel(relation), ChangeType.Export, msg);
-					}					
+                    } 					
+				} 
+
+				if(propertyAliasValue.IsNullOrWhiteSpace() && 
+					propertyTypeKeyValue.IsNullOrWhiteSpace() && 
+					dataTypeDefinitionKeyValue.IsNullOrWhiteSpace())
+				{
+					// Standard Umbraco Relation, only worry about the custom RelationKey
+					convertCommentIds = false;
 				} else
 				{
-					string msg = "Data type definition Id could not be retrieved from Relation Comment XML data.";
-					LogHelper.Warn(typeof(RelationSerializer), msg);
-					//return SyncAttempt<XElement>.Fail(GetRelationNameLabel(relation), ChangeType.Export, msg);
+					convertCommentIds = true;
+
+					// Ensure all required keys are present
+					if (propertyAliasValue.IsNullOrWhiteSpace())
+					{
+						string msg = "PropertyAlias not found for " + relationLabel;
+						LogHelper.Warn(typeof(RelationSerializer), msg);
+						return SyncAttempt<XElement>.Fail(relationLabel, ChangeType.Export, msg);
+					}
+					if (propertyTypeKeyValue.IsNullOrWhiteSpace())
+					{
+						string msg = "PropertyTypeKey not found for " + relationLabel;
+						LogHelper.Warn(typeof(RelationSerializer), msg);
+						return SyncAttempt<XElement>.Fail(relationLabel, ChangeType.Export, msg);
+					}
+					if (dataTypeDefinitionKeyValue.IsNullOrWhiteSpace())
+					{
+						string msg = "DataTypeDefinitionKey not found for " + relationLabel;
+						LogHelper.Warn(typeof(RelationSerializer), msg);
+						return SyncAttempt<XElement>.Fail(relationLabel, ChangeType.Export, msg);
+					}
 				}
 
-				// Look for our custom RelationKey. If one isn't present we need to either create an empty placeholder value or omitt the value entirely
-				relationKey = relationMappingComment.Attribute("RelationKey").ValueOrDefault(Guid.Empty);
-				if (relationKey.Equals(Guid.Empty))
-				{
-					//relationKey = Guid.NewGuid();
-					//relationMappingComment.SetAttributeValue("RelationKey", relationKey); 					
-				}
+				// Look for our custom RelationKey in existing comment xml data
+				relationKey = relationComment.Attribute("RelationKey").ValueOrDefault(Guid.Empty);
+				
 			}
 						
 			node.Add(new XElement("ChildId", relation.ChildId));
@@ -321,16 +336,15 @@ namespace Jumoo.uSync.Core.Serializers
 			node.Add(new XElement("ParentId", relation.ParentId)); 
 			node.Add(new XElement("ParentKey", parent.Key));
 			node.Add(new XElement("RelationTypeAlias", relation.RelationType.Alias));		
-			node.Add(new XElement("RelationTypeKey", relation.RelationType.Key));			
-			node.Add(new XElement("Comment", relationMappingComment == null ? string.Empty : relationMappingComment.ToString()));
-			if (!propertyTypeKeyValue.IsNullOrWhiteSpace())
+			node.Add(new XElement("RelationTypeKey", relation.RelationType.Key));
+			node.Add(new XElement("RelationKey", relationKey));
+						
+			if (convertCommentIds)
 			{
+				node.Add(new XElement("PropertyAlias", propertyAliasValue));
 				node.Add(new XElement("PropertyTypeKey", propertyTypeKeyValue));
-			}
-			if (!dataTypeDefinitionKeyValue.IsNullOrWhiteSpace())
-			{
 				node.Add(new XElement("DataTypeDefinitionKey", dataTypeDefinitionKeyValue));
-			}			
+			}		
 			
 			return SyncAttempt<XElement>.SucceedIf(
 			node != null, GetRelationNameLabel(relation), node, typeof(IRelation), ChangeType.Export);
@@ -502,22 +516,17 @@ namespace Jumoo.uSync.Core.Serializers
 		{
 			XElement comment = relation.Comment.Length > 0 ? XElement.Parse(relation.Comment) : null;
 			Guid relationKey = comment != null ? comment.Attribute("RelationKey").ValueOrDefault(Guid.Empty) : Guid.Empty;
-			string fileNameKey = relationKey.Equals(Guid.Empty) ? relation.Id.ToString() : relationKey.ToString();
+			string label = relationKey.Equals(Guid.Empty) ? relation.Id.ToString() : relationKey.ToString();
 
-			return "Relation " + relation.Id + " " + fileNameKey;
+			return "Relation " + relation.Id + " " + label;
 		}
 
 		public string GetRelationNameLabel(XElement node)
 		{
 			Guid relationKey = node.Element("Comment").Attribute("RelationKey").ValueOrDefault(Guid.Empty);
-			string fileNameKey = relationKey.Equals(Guid.Empty) ? node.Element("Id").ValueOrDefault(string.Empty) : relationKey.ToString();
+			string label = relationKey.Equals(Guid.Empty) ? node.Element("Id").ValueOrDefault(string.Empty) : relationKey.ToString();
 
-			//string label = node.Element("Id").ValueOrDefault(string.Empty) + 
-			//	node.Element("Comment").Attribute("PropertyTypeAlias").ValueOrDefault(string.Empty) +				
-			//	" Parent: " + node.Element("ParentId").ValueOrDefault(string.Empty) +
-			//	" Child: " + node.Element("ChildId").ValueOrDefault(string.Empty);
-
-			return "Relation " + fileNameKey;
+			return "Relation " + label;
 		}
 
 		internal int GetIdFromGuid(Guid guid)
