@@ -165,13 +165,11 @@ namespace Jumoo.uSync.Core.Serializers
 					return SyncAttempt<IRelation>.Fail(relationName, ChangeType.Import, msg);
 				}
 
-				if (relationComment.Element("RelationMapping") != null)
-				{
-					// Ensure Id values in Comment node are updated and correct for the target environment before continuing with import
-					relationComment.SetAttributeValue("PropertyAlias", propertyAlias);
-					relationComment.SetAttributeValue("PropertyTypeId", propertyType.Id);
-					relationComment.SetAttributeValue("DataTypeDefinitionId", dataTypeDefinition.Id);
-				}
+				// Ensure Id values in Comment node are updated and correct for the target environment before continuing with import
+				relationComment.SetAttributeValue("PropertyAlias", propertyAlias);
+				relationComment.SetAttributeValue("PropertyTypeId", propertyType.Id);
+				relationComment.SetAttributeValue("DataTypeDefinitionId", dataTypeDefinition.Id);
+							
 			}
 			
 			// Look for existing relation record
@@ -523,10 +521,21 @@ namespace Jumoo.uSync.Core.Serializers
 
 		public string GetRelationNameLabel(XElement node)
 		{
-			Guid relationKey = node.Element("Comment").Attribute("RelationKey").ValueOrDefault(Guid.Empty);
-			string label = relationKey.Equals(Guid.Empty) ? node.Element("Id").ValueOrDefault(string.Empty) : relationKey.ToString();
+			// NOTE: XElement node can be formatted either as Comment data directly from the database or as a uSync Relation config file
 
-			return "Relation " + label;
+			Guid relationKey = Guid.Empty;
+			string label = "Relation ";
+
+			if (node.Name == "RelationMapping" && node.Attributes("RelationKey").Any())
+			{
+				// Database Comment node				
+				label += node.Attribute("RelationKey").ValueOrDefault(string.Empty);                
+			} else if (node.Elements("RelationKey").Any())
+			{
+				label += node.Element("RelationKey").ValueOrDefault(string.Empty);					
+            }				
+			
+			return label;
 		}
 
 		internal int GetIdFromGuid(Guid guid)

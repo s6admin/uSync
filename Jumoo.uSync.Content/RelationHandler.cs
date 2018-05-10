@@ -196,7 +196,7 @@ namespace Jumoo.uSync.Content
 			Guid key = Guid.Empty;
 			
 			// Some Relation Types don't generate any Comment data so we may have to add some boilerplate before applying our custom Key
-			XElement comment = item.Comment.Length == 0 ? new XElement("RelationMapping") : XElement.Parse(item.Comment);
+			XElement comment = item.Comment == null || item.Comment.Length == 0 ? new XElement("RelationMapping") : XElement.Parse(item.Comment);
 			
 			key = comment.Attribute("RelationKey").ValueOrDefault(Guid.Empty);
 
@@ -212,7 +212,7 @@ namespace Jumoo.uSync.Content
 
 		private bool HasRelationKey(IRelation item)
 		{
-			XElement comment = item.Comment.Length > 0 ? XElement.Parse(item.Comment) : null;
+			XElement comment = item.Comment != null && item.Comment.Length > 0 ? XElement.Parse(item.Comment) : null;
 			return comment != null && !comment.Attribute("RelationKey").ValueOrDefault(Guid.Empty).Equals(Guid.Empty);
         }
 
