@@ -179,7 +179,13 @@ namespace Jumoo.uSync.Snapshots
             var snapshot = FindSnapshot(snapshotName);
 
             if (snapshot != null && Directory.Exists(snapshot.Folder))
-                Directory.Delete(snapshot.Folder, true);
+			{
+				Directory.Delete(snapshot.Folder, true);
+				// S6 ThreadSleep
+				// because of https://stackoverflow.com/questions/24265481/after-directory-delete-the-directory-exists-returning-true-sometimes
+				while (Directory.Exists(snapshot.Folder)) System.Threading.Thread.Sleep(0);
+			}
+                
 
             return true;
         }
@@ -200,7 +206,13 @@ namespace Jumoo.uSync.Snapshots
             LogHelper.Debug<SnapshotManager>("Building Snapshots: {0}", () => folder, ()=> temp);
 
             if (Directory.Exists(temp))
-                Directory.Delete(temp, true);
+			{
+				Directory.Delete(temp, true);
+				// S6 ThreadSleep
+				// because of https://stackoverflow.com/questions/24265481/after-directory-delete-the-directory-exists-returning-true-sometimes
+				while (Directory.Exists(temp)) System.Threading.Thread.Sleep(0);
+			}
+                
 
             Directory.CreateDirectory(temp);
 

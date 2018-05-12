@@ -96,9 +96,12 @@ namespace Jumoo.uSync.Core.Helpers
                         // if we've created a new file in umbraco, it will be in a new folder
                         // and the old current file will need to be deleted.
                         if (Directory.Exists(currentFile.DirectoryName))
-                           
-                                Directory.Delete(currentFile.DirectoryName, true);
-                           
+						{
+							Directory.Delete(currentFile.DirectoryName, true);
+							// S6 ThreadSleep
+							// because of https://stackoverflow.com/questions/24265481/after-directory-delete-the-directory-exists-returning-true-sometimes
+							while (Directory.Exists(currentFile.DirectoryName)) System.Threading.Thread.Sleep(0);
+						}  
                     }
                 }
                 else

@@ -71,7 +71,10 @@ namespace Jumoo.uSync.BackOffice.Controllers
                 foreach (var child in System.IO.Directory.GetDirectories(folder))
                 {
                     System.IO.Directory.Delete(child, true);
-                }
+					// S6 ThreadSleep
+					// because of https://stackoverflow.com/questions/24265481/after-directory-delete-the-directory-exists-returning-true-sometimes
+					while (System.IO.Directory.Exists(child)) System.Threading.Thread.Sleep(0);
+				}
                 return true;
             }
             catch (System.IO.IOException ex)

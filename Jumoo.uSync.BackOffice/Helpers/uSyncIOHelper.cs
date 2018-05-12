@@ -150,9 +150,9 @@ namespace Jumoo.uSync.BackOffice.Helpers
 			if (Directory.Exists(dir))
 			{
 				if (!Directory.EnumerateFileSystemEntries(dir).Any())
-				{
-					// because of https://stackoverflow.com/questions/24265481/after-directory-delete-the-directory-exists-returning-true-sometimes
+				{	
 					Directory.Delete(dir);
+					// because of https://stackoverflow.com/questions/24265481/after-directory-delete-the-directory-exists-returning-true-sometimes
 					while (Directory.Exists(dir)) System.Threading.Thread.Sleep(0);
 				}
 			}
